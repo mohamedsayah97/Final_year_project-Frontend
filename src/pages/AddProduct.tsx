@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import { createProduct, clearCreateStatus } from '../redux/features/addSlice';
+import { useNavigate } from 'react-router-dom';
+import { instance } from '../config/axios';
 
 interface ProductFormData {
     name: string;
@@ -19,9 +19,8 @@ interface FormErrors {
 }
 
 const AddProductForm = () => {
-    const dispatch = useAppDispatch();
-    const { createStatus, createError } = useAppSelector((state) => state.add);
-
+    const navigate = useNavigate();
+    
     // État local du formulaire
     const [formData, setFormData] = useState<ProductFormData>({
         name: '',
@@ -32,6 +31,9 @@ const AddProductForm = () => {
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
+    const [isLoading, setIsLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string[]>([]);
+    const [successMessage, setSuccessMessage] = useState('');
 
     // Fonctions de validation individuelles
     const validateName = (value: string): string | undefined => {
@@ -124,14 +126,17 @@ const AddProductForm = () => {
     // Soumission du formulaire avec axios
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
+        
         // Valider le formulaire avant soumission
         if (!validateForm()) {
             return;
         }
 
+        setIsLoading(true);
+        setErrorMessage([]);
+        setSuccessMessage('');
+
         try {
-            // Préparer les données selon le DTO CreateProductDto
             const productData = {
                 name: formData.name.trim(),
                 description: formData.description.trim(),
@@ -140,68 +145,96 @@ const AddProductForm = () => {
                 location: formData.location.trim(),
             };
 
-            console.log('Envoi des données avec axios:', productData);
+            console.log('Envoi des données:', productData);
+            const response = await instance.post('/products/create', productData);
 
-            // Utiliser le createProduct thunk avec axios
-            await dispatch(createProduct(productData)).unwrap();
-
-            console.log('Produit créé avec succès');
-
-            // Réinitialiser le formulaire
-            setFormData({
-                name: '',
-                description: '',
-                price: '',
-                quantity: '',
-                location: '',
-            });
-            setErrors({});
-
-            // Effacer le statut après 3 secondes
+            console.log('Produit créé avec succès', response.data);
+            setSuccessMessage('Produit ajouté avec succès !');
+            
+            // Redirection vers la liste des produits après 1.5 secondes
             setTimeout(() => {
-                dispatch(clearCreateStatus());
-            }, 3000);
-
-        } catch (err) {
-            console.error('Erreur lors de la création:', err);
+                navigate('/list-products');
+            }, 1500);
+            
+        } catch (error: any) {
+            console.error('Erreur lors de la création:', error);
+            
+            if (error.response?.data?.message) {
+                const messages = error.response.data.message;
+                if (Array.isArray(messages)) {
+                    setErrorMessage(messages);
+                } else {
+                    setErrorMessage([messages]);
+                }
+            } else if (error.response?.status === 401) {
+                setErrorMessage(['Vous devez être connecté et avoir les droits pour ajouter un produit']);
+            } else {
+                setErrorMessage(['Une erreur est survenue lors de l\'ajout du produit']);
+            }
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-6">
             <div className="max-w-3xl mx-auto">
+                
+                {/* Bouton retour */}
+                <div className="mb-4">
+                    <button
+                        onClick={() => navigate('/list-products')}
+                        className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    >
+                        <i className="fas fa-arrow-left"></i>
+                        Retour à la liste
+                    </button>
+                </div>
 
                 {/* Message de succès */}
-                {createStatus === 'succeeded' && (
+                {successMessage && (
                     <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg text-center">
-                        <i className="fas fa-check-circle mr-2"></i>
-                        Produit créé avec succès !
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <i className="fas fa-check-circle"></i>
+                                <span>{successMessage}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <i className="fas fa-spinner fa-spin"></i>
+                                <span>Redirection...</span>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* Message d'erreur */}
-                {createError && (
-                    <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-center">
-                        <i className="fas fa-exclamation-triangle mr-2"></i>
-                        {createError}
+                {errorMessage.length > 0 && (
+                    <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                        <div className="font-semibold mb-1 flex items-center gap-2">
+                            <i className="fas fa-exclamation-triangle"></i>
+                            Erreurs de validation :
+                        </div>
+                        <ul className="list-disc list-inside text-sm">
+                            {errorMessage.map((msg, index) => (
+                                <li key={index}>{msg}</li>
+                            ))}
+                        </ul>
                     </div>
                 )}
 
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
-                    {/* Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                    <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4">
                         <div className="flex items-center gap-3">
-                            <i className="fas fa-plus-circle text-white text-2xl"></i>
+                            <i className="fas fa-box text-white text-2xl"></i>
                             <div>
-                                <h2 className="text-xl font-bold text-white">OptiManage</h2>
-                                <p className="text-blue-100 text-sm">
+                                <h2 className="text-xl font-bold text-white">Ajouter un Produit</h2>
+                                <p className="text-purple-100 text-sm">
                                     Créer un nouveau produit dans votre inventaire
                                 </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Form */}
                     <form onSubmit={handleSubmit} className="p-6 space-y-5">
                         {/* Name */}
                         <div>
@@ -215,8 +248,9 @@ const AddProductForm = () => {
                                 value={formData.name}
                                 onChange={handleChange}
                                 placeholder="e.g., Wireless Mouse"
-                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.name ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-200'
+                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.name ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-purple-400 focus:ring-purple-200'
                                     }`}
+                                disabled={isLoading}
                             />
                             {errors.name && (
                                 <p className="mt-1 text-sm text-red-500">
@@ -238,8 +272,9 @@ const AddProductForm = () => {
                                 onChange={handleChange}
                                 rows={3}
                                 placeholder="Describe the product..."
-                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition resize-none ${errors.description ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-200'
+                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition resize-none ${errors.description ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-purple-400 focus:ring-purple-200'
                                     }`}
+                                disabled={isLoading}
                             />
                             {errors.description && (
                                 <p className="mt-1 text-sm text-red-500">
@@ -264,8 +299,9 @@ const AddProductForm = () => {
                                     step="0.01"
                                     min="0.01"
                                     placeholder="0.00"
-                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.price ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-200'
+                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.price ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-purple-400 focus:ring-purple-200'
                                         }`}
+                                    disabled={isLoading}
                                 />
                                 {errors.price && (
                                     <p className="mt-1 text-sm text-red-500">
@@ -288,8 +324,9 @@ const AddProductForm = () => {
                                     step="1"
                                     min="0"
                                     placeholder="0"
-                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.quantity ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-200'
+                                    className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.quantity ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-purple-400 focus:ring-purple-200'
                                         }`}
+                                    disabled={isLoading}
                                 />
                                 {errors.quantity && (
                                     <p className="mt-1 text-sm text-red-500">
@@ -312,8 +349,9 @@ const AddProductForm = () => {
                                 value={formData.location}
                                 onChange={handleChange}
                                 placeholder="Warehouse A, Store #42"
-                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.location ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-blue-400 focus:ring-blue-200'
+                                className={`w-full px-4 py-2.5 bg-gray-50 border rounded-xl focus:bg-white focus:ring-2 outline-none transition ${errors.location ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-gray-200 focus:border-purple-400 focus:ring-purple-200'
                                     }`}
+                                disabled={isLoading}
                             />
                             {errors.location && (
                                 <p className="mt-1 text-sm text-red-500">
@@ -324,29 +362,34 @@ const AddProductForm = () => {
                         </div>
 
                         {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={createStatus === 'loading'}
-                            className={`w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 ease-in-out transform hover:scale-[1.02] ${createStatus === 'loading' ? 'opacity-75 cursor-not-allowed' : ''
-                                }`}
-                        >
-                            {createStatus === 'loading' ? (
-                                <>
-                                    <i className="fas fa-spinner fa-spin mr-2"></i>
-                                    Création en cours...
-                                </>
-                            ) : createStatus === 'succeeded' ? (
-                                <>
-                                    <i className="fas fa-check-circle mr-2"></i>
-                                    Produit créé avec succès !
-                                </>
-                            ) : (
-                                <>
-                                    <i className="fas fa-plus mr-2"></i>
-                                    Ajouter le produit
-                                </>
-                            )}
-                        </button>
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/list-products')}
+                                className="w-1/3 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200"
+                                disabled={isLoading}
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className={`w-2/3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 ease-in-out transform hover:scale-[1.02] ${isLoading ? 'opacity-75 cursor-not-allowed' : ''
+                                    }`}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <i className="fas fa-spinner fa-spin mr-2"></i>
+                                        Création en cours...
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-plus mr-2"></i>
+                                        Ajouter le produit
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>

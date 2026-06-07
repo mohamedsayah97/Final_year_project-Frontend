@@ -9,6 +9,7 @@ export interface RegisterUserData {
   password: string;
   phoneNumber: string;
   address: string;
+  role?: string;
 }
 
 // Types pour la réponse du backend
@@ -49,6 +50,7 @@ export const registerUser = createAsyncThunk<
         password: userData.password,
         phoneNumber: userData.phoneNumber,
         address: userData.address,
+        role: userData.role || 'admin',
       });
       
       // Stocker le token si retourné

@@ -1,160 +1,324 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { instance } from '../config/axios';
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
 const AddInvoice = () => {
+  const navigate = useNavigate();
+  
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [date, setDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [taxAmount, setTaxAmount] = useState('');
+  const [status, setStatus] = useState('');
+  const [paymentTerms, setPaymentTerms] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string[]>([]);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  useEffect(() => {
+    fetchProducts();
+    generateInvoiceNumber();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const response = await instance.get('/products/all');
+      setProducts(response.data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des produits', error);
+    }
+  };
+
+  const generateInvoiceNumber = () => {
+    const year = new Date().getFullYear();
+    const random = Math.floor(Math.random() * 10000);
+    setInvoiceNumber(`INV-${year}-${random}`);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage([]);
+    setSuccessMessage('');
+
+    try {
+      const invoiceData = {
+        invoiceNumber,
+        date,
+        dueDate,
+        totalAmount: parseFloat(totalAmount),
+        taxAmount: parseFloat(taxAmount),
+        status,
+        paymentTerms,
+      };
+
+      console.log('Données envoyées:', invoiceData);
+      const response = await instance.post('/invoices/create', invoiceData);
+
+      console.log('Facture ajoutée avec succès', response.data);
+      setSuccessMessage('Facture ajoutée avec succès !');
+      
+      setTimeout(() => {
+        navigate('/invoices');
+      }, 1500);
+      
+    } catch (error: any) {
+      console.error('Erreur lors de l\'ajout de la facture', error);
+      
+      if (error.response?.data?.message) {
+        const messages = error.response.data.message;
+        setErrorMessage(Array.isArray(messages) ? messages : [messages]);
+      } else if (error.response?.status === 401) {
+        setErrorMessage(['Vous devez être connecté pour ajouter une facture']);
+      } else {
+        setErrorMessage(['Une erreur est survenue lors de l\'ajout de la facture']);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-100 p-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="h-32 md:h-48"></div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-100 p-6">
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Bouton retour */}
+        <div className="mb-4">
+          <button
+            onClick={() => navigate('/invoices')}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
+          >
+            <i className="fas fa-arrow-left"></i>
+            Retour à la liste
+          </button>
+        </div>
         
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-5">
+          <div className="bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="bg-white/20 p-2 rounded-xl">
-                <i className="fas fa-file-invoice-dollar text-white text-xl"></i>
+                <i className="fas fa-file-invoice text-white text-xl"></i>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Add New Invoice</h2>
-                <p className="text-indigo-100 text-sm">
-                  Create and manage customer invoices
-                </p>
+                <h2 className="text-xl font-bold text-white">Create New Invoice</h2>
+                <p className="text-blue-100 text-sm">Enter invoice information below</p>
               </div>
             </div>
           </div>
 
-          {/* Form */}
-          <form className="p-6 space-y-5">
-            {/* Invoice Number avec préfixe */}
+          {/* Message de succès */}
+          {successMessage && (
+            <div className="mx-6 mt-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <i className="fas fa-check-circle"></i>
+                  <span>{successMessage}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <i className="fas fa-spinner fa-spin"></i>
+                  <span>Redirection...</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Message d'erreur */}
+          {errorMessage.length > 0 && (
+            <div className="mx-6 mt-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+              <div className="font-semibold mb-1 flex items-center gap-2">
+                <i className="fas fa-exclamation-triangle"></i>
+                Erreurs de validation :
+              </div>
+              <ul className="list-disc list-inside text-sm">
+                {errorMessage.map((msg, index) => (
+                  <li key={index}>{msg}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <form className="p-6 space-y-5" onSubmit={handleSubmit}>
+            {/* Invoice Number (auto-généré) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Invoice Number <span className="text-red-500">*</span>
+                Numéro de Facture <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <i className="fas fa-file-alt absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <i className="fas fa-hashtag absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                 <input
                   type="text"
-                  placeholder="INV-2024-001"
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl outline-none cursor-not-allowed"
+                  value={invoiceNumber}
+                  readOnly
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-1">Unique invoice identifier</p>
             </div>
 
-            {/* Dates section */}
-            <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-              <div className="flex items-center gap-2 mb-3">
-                <i className="fas fa-calendar-alt text-indigo-500 text-sm"></i>
-                <span className="text-sm font-semibold text-gray-700">Invoice Dates</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Issue Date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Amounts section */}
-            <div className="bg-gray-50 rounded-xl p-4 space-y-4">
-              <div className="flex items-center gap-2 mb-3">
-                <i className="fas fa-coins text-indigo-500 text-sm"></i>
-                <span className="text-sm font-semibold text-gray-700">Amount Details</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Total Amount
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      className="w-full pl-8 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Tax Amount
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      className="w-full pl-8 pr-4 py-2 bg-white border border-gray-200 rounded-lg focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Status & Payment Terms */}
+            {/* Date et Date d'échéance */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
+                  Date de la facture <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <i className="fas fa-flag absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                  <select className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition cursor-pointer appearance-none">
-                    <option value="">Select status</option>
-                    <option value="draft">📝 Draft</option>
-                    <option value="pending">⏳ Pending</option>
-                    <option value="paid">✅ Paid</option>
-                    <option value="overdue">⚠️ Overdue</option>
-                    <option value="cancelled">❌ Cancelled</option>
-                  </select>
-                  <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                  <i className="fas fa-calendar-alt absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <input
+                    type="date"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Terms
+                  Date d'échéance <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <i className="fas fa-handshake absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                  <select className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition cursor-pointer appearance-none">
-                    <option value="">Select payment terms</option>
-                    <option value="due_on_receipt">Due on receipt</option>
-                    <option value="net15">Net 15 days</option>
-                    <option value="net30">Net 30 days</option>
-                    <option value="net45">Net 45 days</option>
-                    <option value="net60">Net 60 days</option>
-                  </select>
-                  <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                  <i className="fas fa-calendar-check absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <input
+                    type="date"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Buttons */}
+            {/* Montant total et Taxes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Montant Total (€) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <i className="fas fa-euro-sign absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                    value={totalAmount}
+                    onChange={(e) => setTotalAmount(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Montant des Taxes (€) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <i className="fas fa-percent absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none transition"
+                    value={taxAmount}
+                    onChange={(e) => setTaxAmount(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Statut et Conditions de paiement */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Statut <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <i className="fas fa-circle-info absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <select
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none transition appearance-none"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  >
+                    <option value="">Sélectionner un statut</option>
+                    <option value="pending">⏳ En attente</option>
+                    <option value="paid">✅ Payée</option>
+                    <option value="overdue">⚠️ En retard</option>
+                    <option value="cancelled">❌ Annulée</option>
+                  </select>
+                  <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Conditions de paiement <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <i className="fas fa-clock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <select
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-200 outline-none transition appearance-none"
+                    value={paymentTerms}
+                    onChange={(e) => setPaymentTerms(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  >
+                    <option value="">Sélectionner les conditions</option>
+                    <option value="immediate">💵 Paiement immédiat</option>
+                    <option value="net15">📅 Net 15 jours</option>
+                    <option value="net30">📅 Net 30 jours</option>
+                    <option value="net60">📅 Net 60 jours</option>
+                  </select>
+                  <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                </div>
+              </div>
+            </div>
+
+            {/* Boutons */}
             <div className="flex gap-3 pt-4">
               <button
                 type="button"
+                onClick={() => navigate('/invoices')}
                 className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-xl transition duration-200"
+                disabled={isLoading}
               >
                 <i className="fas fa-times mr-2"></i>
-                Cancel
+                Annuler
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 transform hover:scale-[1.02]"
+                disabled={isLoading}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 transform hover:scale-[1.02] disabled:opacity-75 disabled:cursor-not-allowed"
               >
-                <i className="fas fa-save mr-2"></i>
-                Create Invoice
+                {isLoading ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin mr-2"></i>
+                    Création en cours...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-save mr-2"></i>
+                    Créer la facture
+                  </>
+                )}
               </button>
             </div>
           </form>
