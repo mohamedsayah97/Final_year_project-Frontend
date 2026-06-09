@@ -31,5 +31,13 @@ jobs:
     - name: Run tests
       run: npm run test:ci
     
+    - name: Snyk security scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+      continue-on-error: true
+    
     - name: Build
       run: npm run build

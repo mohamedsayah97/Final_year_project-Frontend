@@ -19,7 +19,12 @@
     "test:ci": "vitest run --coverage --silent",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "snyk:test": "snyk test --severity-threshold=high",
+    "snyk:monitor": "snyk monitor",
+    "snyk:fix": "snyk wizard",
+    "security": "npm audit && npm run snyk:test",
+    "security:fix": "npm audit fix && npm run snyk:fix"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
@@ -52,6 +57,7 @@
     "jsdom": "^29.1.1",
     "lint-staged": "^15.5.2",
     "prettier": "^3.8.4",
+    "snyk": "^1.1305.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.0",
     "vite": "^8.0.4",
