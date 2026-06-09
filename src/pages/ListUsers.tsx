@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { instance } from '../config/axios';
-import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../redux/hooks';
+import React, { useEffect, useState, useCallback } from "react";
+import { instance } from "../config/axios";
+import { useNavigate } from "react-router-dom";
 
 interface User {
   id: string;
@@ -14,98 +13,115 @@ interface User {
   registrationDate: string;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+  message?: string;
+}
+
 const ListUsers = () => {
   const navigate = useNavigate();
-  const { user } = useAppSelector((state) => state.login);
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(10);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [roleFilter, setRoleFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState("");
 
   // Récupérer l'ID de l'utilisateur connecté depuis localStorage
-  const currentUserId = localStorage.getItem('userId');
+  const currentUserId = localStorage.getItem("userId");
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await instance.get('/user/all');
+      const response = await instance.get("/user/all");
       setUsers(response.data);
-    } catch (error: any) {
-      console.error('Error fetching users', error);
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Error fetching users", error);
       if (error.response?.status === 401) {
-        setError('You must be logged in to view users');
+        setError("You must be logged in to view users");
       } else if (error.response?.status === 403) {
-        setError('You do not have permissions to view this page');
+        setError("You do not have permissions to view this page");
       } else {
-        setError('Unable to load the users list');
+        setError("Unable to load the users list");
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete user "${name}"?`)) {
-      setIsDeleting(id);
-      try {
-        await instance.delete(`/user/${id}`);
-        await fetchUsers();
-        alert('User deleted successfully');
-      } catch (error: any) {
-        console.error('Erreur lors de la suppression', error);
-        if (error.response?.status === 403) {
-          alert('You do not have permission to delete this user');
-        } else {
-          alert('Error deleting the user');
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleDelete = useCallback(
+    async (id: string, name: string) => {
+      if (window.confirm(`Are you sure you want to delete user "${name}"?`)) {
+        setIsDeleting(id);
+        try {
+          await instance.delete(`/user/${id}`);
+          await fetchUsers();
+          alert("User deleted successfully");
+        } catch (err: unknown) {
+          const error = err as ApiError;
+          console.error("Erreur lors de la suppression", error);
+          if (error.response?.status === 403) {
+            alert("You do not have permission to delete this user");
+          } else {
+            alert("Error deleting the user");
+          }
+        } finally {
+          setIsDeleting(null);
         }
-      } finally {
-        setIsDeleting(null);
       }
-    }
-  };
+    },
+    [fetchUsers],
+  );
 
-  const handleUpdateRole = async (id: string, newRole: string) => {
-    if (window.confirm(`Do you want to change this user's role?`)) {
-      try {
-        await instance.put(`/user/update-role/${id}`, { role: newRole });
-        await fetchUsers();
-        alert('Role updated successfully');
-      } catch (error: any) {
-        console.error('Error updating the role', error);
-        alert('Error updating the role');
+  const handleUpdateRole = useCallback(
+    async (id: string, newRole: string) => {
+      if (window.confirm(`Do you want to change this user's role?`)) {
+        try {
+          await instance.put(`/user/update-role/${id}`, { role: newRole });
+          await fetchUsers();
+          alert("Role updated successfully");
+        } catch (err: unknown) {
+          const error = err as ApiError;
+          console.error("Error updating the role", error);
+          alert("Error updating the role");
+        }
       }
-    }
-  };
+    },
+    [fetchUsers],
+  );
 
   // Filtrer les utilisateurs : exclure l'admin connecté ET ne pas afficher les autres admins
-  const filteredUsers = users.filter(userItem => {
+  const filteredUsers = users.filter((userItem) => {
     // Exclure l'utilisateur connecté lui-même
     if (userItem.id === currentUserId) {
       return false;
     }
-    
+
     // Exclure tous les utilisateurs avec le rôle 'admin'
-    if (userItem.role === 'admin') {
+    if (userItem.role === "admin") {
       return false;
     }
-    
+
     // Appliquer les filtres de recherche
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch =
+      searchTerm === "" ||
       userItem.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       userItem.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       userItem.email.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = roleFilter === '' || userItem.role === roleFilter;
-    
+
+    const matchesRole = roleFilter === "" || userItem.role === roleFilter;
+
     return matchesSearch && matchesRole;
   });
 
@@ -114,34 +130,73 @@ const ListUsers = () => {
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
-  const getRoleBadge = (role: string) => {
-    switch(role) {
-      case 'admin':
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">👑 Admin</span>;
-      case 'RH':
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">👥 HR</span>;
-      case 'financier':
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">💰 Finance</span>;
-      case 'stock_manager':
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">📦 Stock Manager</span>;
-      case 'park_manager':
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">🚗 Fleet Manager</span>;
+  const getRoleBadge = useCallback((role: string): React.ReactNode => {
+    switch (role) {
+      case "admin":
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+            👑 Admin
+          </span>
+        );
+      case "RH":
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+            👥 HR
+          </span>
+        );
+      case "financier":
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+            💰 Finance
+          </span>
+        );
+      case "stock_manager":
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+            📦 Stock Manager
+          </span>
+        );
+      case "park_manager":
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+            🚗 Fleet Manager
+          </span>
+        );
       default:
-        return <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">{role}</span>;
+        return (
+          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+            {role}
+          </span>
+        );
     }
-  };
+  }, []);
 
   const roleOptions = [
-    { value: 'RH', label: '👥 RH', icon: '👥' },
-    { value: 'financier', label: '💰 Finance', icon: '💰' },
-    { value: 'stock_manager', label: '📦 Stock Manager', icon: '📦' },
-    { value: 'park_manager', label: '🚗 Park Manager', icon: '🚗' },
+    { value: "RH", label: "👥 RH", icon: "👥" },
+    { value: "financier", label: "💰 Finance", icon: "💰" },
+    { value: "stock_manager", label: "📦 Stock Manager", icon: "📦" },
+    { value: "park_manager", label: "🚗 Park Manager", icon: "🚗" },
   ];
+
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchTerm(e.target.value);
+      setCurrentPage(1);
+    },
+    [],
+  );
+
+  const handleRoleFilterChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setRoleFilter(e.target.value);
+      setCurrentPage(1);
+    },
+    [],
+  );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
-        
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -150,10 +205,12 @@ const ListUsers = () => {
                 <i className="fas fa-users text-blue-600"></i>
                 User Management
               </h1>
-              <p className="text-gray-600">Manage your system users (sub-users)</p>
+              <p className="text-gray-600">
+                Manage your system users (sub-users)
+              </p>
             </div>
             <button
-              onClick={() => navigate('/add-user')}
+              onClick={() => navigate("/add-user")}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2 shadow-md"
             >
               <i className="fas fa-user-plus"></i>
@@ -172,20 +229,14 @@ const ListUsers = () => {
                 placeholder="Search by first name, last name or email..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={handleSearchChange}
               />
             </div>
             <div className="w-full md:w-64">
               <select
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                 value={roleFilter}
-                onChange={(e) => {
-                  setRoleFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={handleRoleFilterChange}
               >
                 <option value="">All roles</option>
                 <option value="RH">👥 RH</option>
@@ -234,7 +285,7 @@ const ListUsers = () => {
               Administrators are not shown in this list.
             </p>
             <button
-              onClick={() => navigate('/add-user')}
+              onClick={() => navigate("/add-user")}
               className="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
             >
               Add sub-user
@@ -272,27 +323,35 @@ const ListUsers = () => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {currentUsers.map((userItem) => (
-                      <tr key={userItem.id} className="hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={userItem.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-semibold">
-                              {userItem.firstName.charAt(0)}{userItem.lastName.charAt(0)}
+                              {userItem.firstName.charAt(0)}
+                              {userItem.lastName.charAt(0)}
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">
                                 {userItem.firstName} {userItem.lastName}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {userItem.address.split(',')[0]}
+                                {userItem.address.split(",")[0]}
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{userItem.email}</div>
+                          <div className="text-sm text-gray-900">
+                            {userItem.email}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-500">{userItem.phoneNumber}</div>
+                          <div className="text-sm text-gray-500">
+                            {userItem.phoneNumber}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -300,9 +359,11 @@ const ListUsers = () => {
                             <select
                               className="text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
                               value={userItem.role}
-                              onChange={(e) => handleUpdateRole(userItem.id, e.target.value)}
+                              onChange={(e) =>
+                                handleUpdateRole(userItem.id, e.target.value)
+                              }
                             >
-                              {roleOptions.map(opt => (
+                              {roleOptions.map((opt) => (
                                 <option key={opt.value} value={opt.value}>
                                   {opt.label}
                                 </option>
@@ -312,22 +373,29 @@ const ListUsers = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-500">
-                            {new Date(userItem.registrationDate).toLocaleDateString('en-US')}
+                            {new Date(
+                              userItem.registrationDate,
+                            ).toLocaleDateString("en-US")}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex space-x-3">
-                            {/* ✅ Bouton Modifier */}
                             <button
-                              onClick={() => navigate(`/update-user/${userItem.id}`)}
+                              onClick={() =>
+                                navigate(`/update-user/${userItem.id}`)
+                              }
                               className="text-blue-600 hover:text-blue-900 transition-colors"
                               title="Edit"
                             >
                               <i className="fas fa-edit text-lg"></i>
                             </button>
-                            {/* Bouton Supprimer */}
                             <button
-                              onClick={() => handleDelete(userItem.id, `${userItem.firstName} ${userItem.lastName}`)}
+                              onClick={() =>
+                                handleDelete(
+                                  userItem.id,
+                                  `${userItem.firstName} ${userItem.lastName}`,
+                                )
+                              }
                               disabled={isDeleting === userItem.id}
                               className="text-red-600 hover:text-red-900 transition-colors disabled:opacity-50"
                               title="Delete"
@@ -352,7 +420,7 @@ const ListUsers = () => {
               <div className="flex justify-center mt-6">
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                     className="px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                   >
@@ -362,7 +430,9 @@ const ListUsers = () => {
                     Page {currentPage} of {totalPages}
                   </span>
                   <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     disabled={currentPage === totalPages}
                     className="px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                   >

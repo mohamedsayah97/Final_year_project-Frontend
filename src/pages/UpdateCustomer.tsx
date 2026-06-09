@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { instance } from '../config/axios';
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { instance } from "../config/axios";
 
 interface Customer {
   id: string;
@@ -12,59 +12,73 @@ interface Customer {
   customerType: string;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
+}
+
 const UpdateCustomer = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [address, setAddress] = useState('');
-  const [customerType, setCustomerType] = useState('');
-  
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [customerType, setCustomerType] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string[]>([]);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    fetchCustomer();
-  }, [id]);
+  // ✅ Déclarer fetchCustomer AVANT le useEffect
+  const fetchCustomer = useCallback(async () => {
+    if (!id) return;
 
-  const fetchCustomer = async () => {
     setIsFetching(true);
     setErrorMessage([]);
     try {
       const response = await instance.get(`/customers/${id}`);
       const customer: Customer = response.data;
-      
+
       setFirstName(customer.firstName);
       setLastName(customer.lastName);
       setEmail(customer.email);
       setPhoneNumber(customer.phoneNumber);
       setAddress(customer.address);
       setCustomerType(customer.customerType);
-      
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération du client', error);
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la récupération du client", error);
       if (error.response?.status === 404) {
-        setErrorMessage(['Client non trouvé']);
+        setErrorMessage(["Client non trouvé"]);
       } else if (error.response?.status === 401) {
-        setErrorMessage(['Vous devez être connecté pour modifier un client']);
+        setErrorMessage(["Vous devez être connecté pour modifier un client"]);
       } else {
-        setErrorMessage(['Impossible de charger les données du client']);
+        setErrorMessage(["Impossible de charger les données du client"]);
       }
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [id]);
+
+  // ✅ useEffect APRÈS la déclaration
+  useEffect(() => {
+    fetchCustomer();
+  }, [fetchCustomer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage([]);
-    setSuccessMessage('');
+    setSuccessMessage("");
 
     try {
       const customerData = {
@@ -78,24 +92,26 @@ const UpdateCustomer = () => {
 
       await instance.put(`/customers/${id}`, customerData);
 
-      setSuccessMessage('Client modifié avec succès !');
-      
+      setSuccessMessage("Client modifié avec succès !");
+
       setTimeout(() => {
-        navigate('/customers');
+        navigate("/customers");
       }, 1500);
-      
-    } catch (error: any) {
-      console.error('Erreur lors de la modification du client', error);
-      
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la modification du client", error);
+
       if (error.response?.data?.message) {
         const messages = error.response.data.message;
         setErrorMessage(Array.isArray(messages) ? messages : [messages]);
       } else if (error.response?.status === 401) {
-        setErrorMessage(['Vous devez être connecté pour modifier un client']);
+        setErrorMessage(["Vous devez être connecté pour modifier un client"]);
       } else if (error.response?.status === 403) {
-        setErrorMessage(['Vous n\'avez pas les droits pour modifier ce client']);
+        setErrorMessage(["Vous n'avez pas les droits pour modifier ce client"]);
       } else {
-        setErrorMessage(['Une erreur est survenue lors de la modification du client']);
+        setErrorMessage([
+          "Une erreur est survenue lors de la modification du client",
+        ]);
       }
     } finally {
       setIsLoading(false);
@@ -116,17 +132,16 @@ const UpdateCustomer = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-6">
       <div className="max-w-3xl mx-auto">
-        
         <div className="mb-4">
           <button
-            onClick={() => navigate('/customers')}
+            onClick={() => navigate("/customers")}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
           >
             <i className="fas fa-arrow-left"></i>
             Retour à la liste
           </button>
         </div>
-        
+
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-5">
             <div className="flex items-center gap-3">
@@ -134,7 +149,9 @@ const UpdateCustomer = () => {
                 <i className="fas fa-edit text-white text-xl"></i>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Modifier le Client</h2>
+                <h2 className="text-xl font-bold text-white">
+                  Modifier le Client
+                </h2>
                 <p className="text-purple-100 text-sm">
                   Modifier les informations du client
                 </p>
@@ -259,7 +276,7 @@ const UpdateCustomer = () => {
             <div className="flex gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate('/customers')}
+                onClick={() => navigate("/customers")}
                 className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-xl transition duration-200"
               >
                 Annuler

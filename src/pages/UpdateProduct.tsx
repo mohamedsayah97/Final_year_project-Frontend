@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { instance } from '../config/axios';
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { instance } from "../config/axios";
 
 interface Product {
   id: string;
@@ -11,90 +11,111 @@ interface Product {
   location: string;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
+}
+
 const UpdateProduct = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [location, setLocation] = useState('');
-  
+
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [location, setLocation] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string[]>([]);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    fetchProduct();
-  }, [id]);
+  // ✅ Déclarer fetchProduct AVANT le useEffect
+  const fetchProduct = useCallback(async () => {
+    if (!id) return;
 
-  const fetchProduct = async () => {
     setIsFetching(true);
     setErrorMessage([]);
     try {
       const response = await instance.get(`/products/${id}`);
       const product: Product = response.data;
-      
+
       setName(product.name);
       setDescription(product.description);
       setPrice(product.price.toString());
       setQuantity(product.quantity.toString());
       setLocation(product.location);
-      
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération du produit', error);
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la récupération du produit", error);
       if (error.response?.status === 404) {
-        setErrorMessage(['Produit non trouvé']);
+        setErrorMessage(["Produit non trouvé"]);
       } else if (error.response?.status === 401) {
-        setErrorMessage(['Vous devez être connecté pour modifier un produit']);
+        setErrorMessage(["Vous devez être connecté pour modifier un produit"]);
       } else {
-        setErrorMessage(['Impossible de charger les données du produit']);
+        setErrorMessage(["Impossible de charger les données du produit"]);
       }
     } finally {
       setIsFetching(false);
     }
-  };
+  }, [id]);
 
-  const validateForm = (): string[] => {
+  // ✅ useEffect APRÈS la déclaration
+  useEffect(() => {
+    fetchProduct();
+  }, [fetchProduct]);
+
+  const validateForm = useCallback((): string[] => {
     const errors: string[] = [];
-    
-    if (!name.trim()) errors.push('Le nom est requis');
-    if (name.length < 5) errors.push('Le nom doit contenir au moins 5 caractères');
-    if (name.length > 120) errors.push('Le nom ne peut pas dépasser 120 caractères');
-    
-    if (!description.trim()) errors.push('La description est requise');
-    if (description.length < 10) errors.push('La description doit contenir au moins 10 caractères');
-    if (description.length > 1000) errors.push('La description ne peut pas dépasser 1000 caractères');
-    
+
+    if (!name.trim()) errors.push("Le nom est requis");
+    if (name.length < 5)
+      errors.push("Le nom doit contenir au moins 5 caractères");
+    if (name.length > 120)
+      errors.push("Le nom ne peut pas dépasser 120 caractères");
+
+    if (!description.trim()) errors.push("La description est requise");
+    if (description.length < 10)
+      errors.push("La description doit contenir au moins 10 caractères");
+    if (description.length > 1000)
+      errors.push("La description ne peut pas dépasser 1000 caractères");
+
     const priceNum = parseFloat(price);
-    if (isNaN(priceNum)) errors.push('Le prix doit être un nombre valide');
-    if (priceNum < 0.01) errors.push('Le prix doit être au minimum 0.01');
-    
+    if (isNaN(priceNum)) errors.push("Le prix doit être un nombre valide");
+    if (priceNum < 0.01) errors.push("Le prix doit être au minimum 0.01");
+
     const quantityNum = parseInt(quantity);
-    if (isNaN(quantityNum)) errors.push('La quantité doit être un nombre valide');
-    if (quantityNum < 0) errors.push('La quantité ne peut pas être négative');
-    
-    if (!location.trim()) errors.push('L\'emplacement est requis');
-    if (location.length < 5) errors.push('L\'emplacement doit contenir au moins 5 caractères');
-    if (location.length > 200) errors.push('L\'emplacement ne peut pas dépasser 200 caractères');
-    
+    if (isNaN(quantityNum))
+      errors.push("La quantité doit être un nombre valide");
+    if (quantityNum < 0) errors.push("La quantité ne peut pas être négative");
+
+    if (!location.trim()) errors.push("L'emplacement est requis");
+    if (location.length < 5)
+      errors.push("L'emplacement doit contenir au moins 5 caractères");
+    if (location.length > 200)
+      errors.push("L'emplacement ne peut pas dépasser 200 caractères");
+
     return errors;
-  };
+  }, [name, description, price, quantity, location]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const errors = validateForm();
     if (errors.length > 0) {
       setErrorMessage(errors);
       return;
     }
-    
+
     setIsLoading(true);
     setErrorMessage([]);
-    setSuccessMessage('');
+    setSuccessMessage("");
 
     try {
       const productData = {
@@ -105,27 +126,31 @@ const UpdateProduct = () => {
         location: location.trim(),
       };
 
-      console.log('Données envoyées pour mise à jour:', productData);
+      console.warn("Données envoyées pour mise à jour:", productData);
       await instance.put(`/products/${id}`, productData);
 
-      setSuccessMessage('Produit modifié avec succès !');
-      
+      setSuccessMessage("Produit modifié avec succès !");
+
       setTimeout(() => {
-        navigate('/list-products');
+        navigate("/list-products");
       }, 1500);
-      
-    } catch (error: any) {
-      console.error('Erreur lors de la modification du produit', error);
-      
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la modification du produit", error);
+
       if (error.response?.data?.message) {
         const messages = error.response.data.message;
         setErrorMessage(Array.isArray(messages) ? messages : [messages]);
       } else if (error.response?.status === 401) {
-        setErrorMessage(['Vous devez être connecté pour modifier un produit']);
+        setErrorMessage(["Vous devez être connecté pour modifier un produit"]);
       } else if (error.response?.status === 403) {
-        setErrorMessage(['Vous n\'avez pas les droits pour modifier ce produit']);
+        setErrorMessage([
+          "Vous n'avez pas les droits pour modifier ce produit",
+        ]);
       } else {
-        setErrorMessage(['Une erreur est survenue lors de la modification du produit']);
+        setErrorMessage([
+          "Une erreur est survenue lors de la modification du produit",
+        ]);
       }
     } finally {
       setIsLoading(false);
@@ -146,30 +171,31 @@ const UpdateProduct = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-6">
       <div className="max-w-3xl mx-auto">
-        
-        {/* Bouton retour */}
         <div className="mb-4">
           <button
-            onClick={() => navigate('/list-products')}
+            onClick={() => navigate("/list-products")}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
           >
             <i className="fas fa-arrow-left"></i>
             Retour à la liste
           </button>
         </div>
-        
+
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4">
             <div className="flex items-center gap-3">
               <i className="fas fa-edit text-white text-2xl"></i>
               <div>
-                <h2 className="text-xl font-bold text-white">Modifier le Produit</h2>
-                <p className="text-purple-100 text-sm">Modifier les informations du produit</p>
+                <h2 className="text-xl font-bold text-white">
+                  Modifier le Produit
+                </h2>
+                <p className="text-purple-100 text-sm">
+                  Modifier les informations du produit
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Message de succès */}
           {successMessage && (
             <div className="mx-6 mt-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
               <div className="flex items-center justify-between">
@@ -185,7 +211,6 @@ const UpdateProduct = () => {
             </div>
           )}
 
-          {/* Message d'erreur */}
           {errorMessage.length > 0 && (
             <div className="mx-6 mt-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
               <div className="font-semibold mb-1 flex items-center gap-2">
@@ -201,51 +226,48 @@ const UpdateProduct = () => {
           )}
 
           <form className="p-6 space-y-5" onSubmit={handleSubmit}>
-            {/* Name */}
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                 <i className="fas fa-tag text-gray-400 text-xs"></i>
                 Nom * (5-120 caractères)
               </label>
-              <input 
-                type="text" 
-                placeholder="e.g., Wireless Mouse" 
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition" 
+              <input
+                type="text"
+                placeholder="e.g., Wireless Mouse"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
 
-            {/* Description */}
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                 <i className="fas fa-align-left text-gray-400 text-xs"></i>
                 Description * (10-1000 caractères)
               </label>
-              <textarea 
+              <textarea
                 rows={3}
-                placeholder="Describe the product..." 
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition resize-none" 
+                placeholder="Describe the product..."
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition resize-none"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 required
               />
             </div>
 
-            {/* Price & Quantity */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                   <i className="fas fa-dollar-sign text-gray-400 text-xs"></i>
                   Prix * (minimum 0.01)
                 </label>
-                <input 
-                  type="number" 
-                  step="0.01" 
+                <input
+                  type="number"
+                  step="0.01"
                   min="0.01"
-                  placeholder="0.00" 
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition" 
+                  placeholder="0.00"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   required
@@ -256,12 +278,12 @@ const UpdateProduct = () => {
                   <i className="fas fa-boxes text-gray-400 text-xs"></i>
                   Quantité * (nombre entier ≥ 0)
                 </label>
-                <input 
-                  type="number" 
-                  step="1" 
+                <input
+                  type="number"
+                  step="1"
                   min="0"
-                  placeholder="0" 
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition" 
+                  placeholder="0"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   required
@@ -269,33 +291,31 @@ const UpdateProduct = () => {
               </div>
             </div>
 
-            {/* Location */}
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
                 <i className="fas fa-location-dot text-gray-400 text-xs"></i>
                 Emplacement * (5-200 caractères)
               </label>
-              <input 
-                type="text" 
-                placeholder="Warehouse A, Store #42" 
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition" 
+              <input
+                type="text"
+                placeholder="Warehouse A, Store #42"
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-purple-400 focus:ring-2 focus:ring-purple-200 outline-none transition"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 required
               />
             </div>
 
-            {/* Buttons */}
             <div className="flex gap-3">
-              <button 
+              <button
                 type="button"
-                onClick={() => navigate('/list-products')}
+                onClick={() => navigate("/list-products")}
                 className="w-1/3 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl transition duration-200"
               >
                 Annuler
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={isLoading}
                 className="w-2/3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 ease-in-out transform hover:scale-[1.02] disabled:opacity-75 disabled:cursor-not-allowed"
               >

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { instance } from '../config/axios';
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { instance } from "../config/axios";
 
 interface User {
   id: string;
@@ -12,81 +12,115 @@ interface User {
   role: string;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
+}
+
 const UpdateUser = () => {
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-  
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [address, setAddress] = useState('');
-  const [role, setRole] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [_role, setRole] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string[]>([]);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const roleOptions = [
-    { value: 'RH', label: '👥 RH', description: 'Gestion des ressources humaines' },
-    { value: 'financier', label: '💰 Financier', description: 'Gestion des finances' },
-    { value: 'stock_manager', label: '📦 Stock Manager', description: 'Gestion des stocks' },
-    { value: 'park_manager', label: '🚗 Park Manager', description: 'Gestion du parc automobile' },
+  const _roleOptions = [
+    {
+      value: "RH",
+      label: "👥 RH",
+      description: "Gestion des ressources humaines",
+    },
+    {
+      value: "financier",
+      label: "💰 Financier",
+      description: "Gestion des finances",
+    },
+    {
+      value: "stock_manager",
+      label: "📦 Stock Manager",
+      description: "Gestion des stocks",
+    },
+    {
+      value: "park_manager",
+      label: "🚗 Park Manager",
+      description: "Gestion du parc automobile",
+    },
   ];
 
-  useEffect(() => {
-    fetchUser();
-  }, [id]);
-
-  const fetchUser = async () => {
+  // ✅ Déclarer fetchUser AVANT le useEffect
+  const fetchUser = useCallback(async () => {
     setIsFetching(true);
     setErrorMessage([]);
     try {
       const response = await instance.get(`/user/current-user`);
       const user: User = response.data;
-      
+
       setFirstName(user.firstName);
       setLastName(user.lastName);
       setEmail(user.email);
       setPhoneNumber(user.phoneNumber);
       setAddress(user.address);
       setRole(user.role);
-      
-    } catch (error: any) {
-      console.error('Error fetching the user', error);
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Error fetching the user", error);
       if (error.response?.status === 404) {
-        setErrorMessage(['User not found']);
+        setErrorMessage(["User not found"]);
       } else {
-        setErrorMessage(['Unable to load user data']);
+        setErrorMessage(["Unable to load user data"]);
       }
     } finally {
       setIsFetching(false);
     }
-  };
+  }, []);
+
+  // ✅ useEffect APRÈS la déclaration
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage([]);
-    setSuccessMessage('');
+    setSuccessMessage("");
 
-    // Validation du mot de passe (optionnel)
     if (password && password !== confirmPassword) {
-        setErrorMessage(['Passwords do not match']);
-        setIsLoading(false);
-        return;
-      }
+      setErrorMessage(["Passwords do not match"]);
+      setIsLoading(false);
+      return;
+    }
 
-      if (password && password.length < 6) {
-        setErrorMessage(['Password must be at least 6 characters']);
-        setIsLoading(false);
-        return;
-      }
+    if (password && password.length < 6) {
+      setErrorMessage(["Password must be at least 6 characters"]);
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const userData: any = {
+      const userData: {
+        firstName: string;
+        lastName: string;
+        email: string;
+        phoneNumber: string;
+        address: string;
+        password?: string;
+      } = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         email: email.trim(),
@@ -94,27 +128,26 @@ const UpdateUser = () => {
         address: address.trim(),
       };
 
-      // Ajouter le mot de passe seulement s'il est fourni
       if (password) {
         userData.password = password;
       }
 
       await instance.put(`/user`, userData);
 
-      setSuccessMessage('User updated successfully!');
-      
+      setSuccessMessage("User updated successfully!");
+
       setTimeout(() => {
-        navigate('/users');
+        navigate("/users");
       }, 1500);
-      
-    } catch (error: any) {
-      console.error('Error updating the user', error);
-      
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Error updating the user", error);
+
       if (error.response?.data?.message) {
         const messages = error.response.data.message;
         setErrorMessage(Array.isArray(messages) ? messages : [messages]);
       } else {
-        setErrorMessage(['An error occurred while updating']);
+        setErrorMessage(["An error occurred while updating"]);
       }
     } finally {
       setIsLoading(false);
@@ -135,31 +168,29 @@ const UpdateUser = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
       <div className="max-w-3xl mx-auto">
-        
-        {/* Bouton retour */}
         <div className="mb-4">
           <button
-            onClick={() => navigate('/users')}
+            onClick={() => navigate("/users")}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
           >
             <i className="fas fa-arrow-left"></i>
             Back to list
+          </button>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="bg-white/20 p-2 rounded-xl">
                 <i className="fas fa-user-edit text-white text-xl"></i>
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Edit User</h2>
-                <p className="text-blue-100 text-sm">
-                  Update user information
-                </p>
+                <p className="text-blue-100 text-sm">Update user information</p>
               </div>
             </div>
-          </button>
-        
           </div>
 
-          {/* Message de succès */}
           {successMessage && (
             <div className="mx-6 mt-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
               <div className="flex items-center justify-between">
@@ -175,7 +206,6 @@ const UpdateUser = () => {
             </div>
           )}
 
-          {/* Message d'erreur */}
           {errorMessage.length > 0 && (
             <div className="mx-6 mt-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
               <div className="font-semibold mb-1 flex items-center gap-2">
@@ -191,7 +221,6 @@ const UpdateUser = () => {
           )}
 
           <form className="p-6 space-y-5" onSubmit={handleSubmit}>
-            {/* Name */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -227,7 +256,6 @@ const UpdateUser = () => {
               </div>
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email <span className="text-red-500">*</span>
@@ -245,7 +273,6 @@ const UpdateUser = () => {
               </div>
             </div>
 
-            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Phone <span className="text-red-500">*</span>
@@ -263,7 +290,6 @@ const UpdateUser = () => {
               </div>
             </div>
 
-            {/* Address */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Address <span className="text-red-500">*</span>
@@ -281,11 +307,11 @@ const UpdateUser = () => {
               </div>
             </div>
 
-            {/* Mot de passe (optionnel) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  New Password <span className="text-gray-400 text-xs">(Optional)</span>
+                  New Password{" "}
+                  <span className="text-gray-400 text-xs">(Optional)</span>
                 </label>
                 <div className="relative">
                   <i className="fas fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -317,11 +343,10 @@ const UpdateUser = () => {
               </div>
             </div>
 
-            {/* Boutons */}
             <div className="flex gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate('/users')}
+                onClick={() => navigate("/users")}
                 className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-xl transition duration-200"
                 disabled={isLoading}
               >
@@ -349,7 +374,7 @@ const UpdateUser = () => {
           </form>
         </div>
       </div>
-    
+    </div>
   );
 };
 

@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running lint (warnings ignored)..."
+npm run lint -- --max-warnings 100
+
+if [ $? -ne 0 ]; then
+  echo "❌ Linting failed with errors!"
+  exit 1
+fi
+
+echo "✨ Formatting staged files..."
+npx lint-staged
+
+echo "✅ Pre-commit hooks passed!"

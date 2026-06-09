@@ -2,7 +2,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { registerUser, clearRegisterState } from "../redux/features/registerSlice";
+import {
+  registerUser,
+  clearRegisterState,
+} from "../redux/features/registerSlice";
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 
 const RegisterPage: React.FC = () => {
@@ -65,7 +68,7 @@ const RegisterPage: React.FC = () => {
 
   function handlePhoneNumberChange(e: React.ChangeEvent<HTMLInputElement>) {
     // ✅ CORRECTION: Permettre les numéros internationaux avec +216
-    let value = e.target.value;
+    const value = e.target.value;
     // Permettre +, chiffres, espaces
     if (/^[\+\d\s]*$/.test(value)) {
       setPhoneNumber(value);
@@ -134,8 +137,10 @@ const RegisterPage: React.FC = () => {
 
     // ✅ CORRECTION: Validation du téléphone (8 chiffres ou +216XXXXXXXX)
     const phoneRegex = /^(\+216)?[0-9]{8}$/;
-    if (!phoneRegex.test(phoneNumber.replace(/\s/g, ''))) {
-      setLocalError("Numéro de téléphone invalide (8 chiffres ou +216XXXXXXXX)");
+    if (!phoneRegex.test(phoneNumber.replace(/\s/g, ""))) {
+      setLocalError(
+        "Numéro de téléphone invalide (8 chiffres ou +216XXXXXXXX)",
+      );
       return;
     }
 
@@ -152,10 +157,10 @@ const RegisterPage: React.FC = () => {
           lastName: lastName.trim(),
           email: email.trim().toLowerCase(),
           password,
-          phoneNumber: phoneNumber.replace(/\s/g, ''), // ✅ Nettoyer les espaces
+          phoneNumber: phoneNumber.replace(/\s/g, ""), // ✅ Nettoyer les espaces
           address: address.trim(),
-          role: 'admin',
-        })
+          role: "admin",
+        }),
       ).unwrap();
       console.log("Inscription réussie !");
     } catch (err: any) {
@@ -539,13 +544,22 @@ const RegisterPage: React.FC = () => {
                   onChange={handleTermsAcceptedChange}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50"
                 />
-                <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
+                <label
+                  htmlFor="terms"
+                  className="ml-2 block text-sm text-gray-900"
+                >
                   I agree to the{" "}
-                  <button type="button" className="text-blue-600 hover:text-blue-500">
+                  <button
+                    type="button"
+                    className="text-blue-600 hover:text-blue-500"
+                  >
                     Terms of Service
                   </button>{" "}
                   and{" "}
-                  <button type="button" className="text-blue-600 hover:text-blue-500">
+                  <button
+                    type="button"
+                    className="text-blue-600 hover:text-blue-500"
+                  >
                     Privacy Policy
                   </button>
                 </label>
@@ -593,7 +607,10 @@ const RegisterPage: React.FC = () => {
             <div className="text-center">
               <p className="text-sm text-gray-600">
                 Already have an account?{" "}
-                <NavLink to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+                <NavLink
+                  to="/login"
+                  className="font-medium text-blue-600 hover:text-blue-500"
+                >
                   Sign in here
                 </NavLink>
               </p>

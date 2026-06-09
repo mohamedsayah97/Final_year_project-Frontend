@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { instance } from '../config/axios';
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { instance } from "../config/axios";
 
 interface Product {
   id: string;
@@ -9,48 +9,61 @@ interface Product {
   quantity: number;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string | string[];
+    };
+  };
+  message?: string;
+}
+
 const AddInvoice = () => {
   const navigate = useNavigate();
-  
-  const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [date, setDate] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [totalAmount, setTotalAmount] = useState('');
-  const [taxAmount, setTaxAmount] = useState('');
-  const [status, setStatus] = useState('');
-  const [paymentTerms, setPaymentTerms] = useState('');
-  const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  
+
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [date, setDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [totalAmount, setTotalAmount] = useState("");
+  const [taxAmount, setTaxAmount] = useState("");
+  const [status, setStatus] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState("");
+  const [_selectedProducts, setSelectedProducts] = useState<unknown[]>([]);
+  const [_products, setProducts] = useState<Product[]>([]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string[]>([]);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    fetchProducts();
-    generateInvoiceNumber();
-  }, []);
-
-  const fetchProducts = async () => {
-    try {
-      const response = await instance.get('/products/all');
-      setProducts(response.data);
-    } catch (error) {
-      console.error('Erreur lors du chargement des produits', error);
-    }
-  };
-
-  const generateInvoiceNumber = () => {
+  // ✅ Déclarer les fonctions AVANT le useEffect
+  const generateInvoiceNumber = useCallback(() => {
     const year = new Date().getFullYear();
     const random = Math.floor(Math.random() * 10000);
     setInvoiceNumber(`INV-${year}-${random}`);
-  };
+  }, []);
+
+  const fetchProducts = useCallback(async () => {
+    try {
+      const response = await instance.get("/products/all");
+      setProducts(response.data);
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors du chargement des produits", error);
+    }
+  }, []);
+
+  // ✅ useEffect APRÈS les déclarations
+  useEffect(() => {
+    fetchProducts();
+    generateInvoiceNumber();
+  }, [fetchProducts, generateInvoiceNumber]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage([]);
-    setSuccessMessage('');
+    setSuccessMessage("");
 
     try {
       const invoiceData = {
@@ -63,26 +76,28 @@ const AddInvoice = () => {
         paymentTerms,
       };
 
-      console.log('Données envoyées:', invoiceData);
-      const response = await instance.post('/invoices/create', invoiceData);
+      console.warn("Données envoyées:", invoiceData);
+      const response = await instance.post("/invoices/create", invoiceData);
 
-      console.log('Facture ajoutée avec succès', response.data);
-      setSuccessMessage('Facture ajoutée avec succès !');
-      
+      console.warn("Facture ajoutée avec succès", response.data);
+      setSuccessMessage("Facture ajoutée avec succès !");
+
       setTimeout(() => {
-        navigate('/invoices');
+        navigate("/invoices");
       }, 1500);
-      
-    } catch (error: any) {
-      console.error('Erreur lors de l\'ajout de la facture', error);
-      
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de l'ajout de la facture", error);
+
       if (error.response?.data?.message) {
         const messages = error.response.data.message;
         setErrorMessage(Array.isArray(messages) ? messages : [messages]);
       } else if (error.response?.status === 401) {
-        setErrorMessage(['Vous devez être connecté pour ajouter une facture']);
+        setErrorMessage(["Vous devez être connecté pour ajouter une facture"]);
       } else {
-        setErrorMessage(['Une erreur est survenue lors de l\'ajout de la facture']);
+        setErrorMessage([
+          "Une erreur est survenue lors de l'ajout de la facture",
+        ]);
       }
     } finally {
       setIsLoading(false);
@@ -92,33 +107,33 @@ const AddInvoice = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-100 p-6">
       <div className="max-w-4xl mx-auto">
-        
-        {/* Bouton retour */}
         <div className="mb-4">
           <button
-            onClick={() => navigate('/invoices')}
+            onClick={() => navigate("/invoices")}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors"
           >
             <i className="fas fa-arrow-left"></i>
             Retour à la liste
           </button>
         </div>
-        
+
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="bg-white/20 p-2 rounded-xl">
                 <i className="fas fa-file-invoice text-white text-xl"></i>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Create New Invoice</h2>
-                <p className="text-blue-100 text-sm">Enter invoice information below</p>
+                <h2 className="text-xl font-bold text-white">
+                  Create New Invoice
+                </h2>
+                <p className="text-blue-100 text-sm">
+                  Enter invoice information below
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Message de succès */}
           {successMessage && (
             <div className="mx-6 mt-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
               <div className="flex items-center justify-between">
@@ -134,7 +149,6 @@ const AddInvoice = () => {
             </div>
           )}
 
-          {/* Message d'erreur */}
           {errorMessage.length > 0 && (
             <div className="mx-6 mt-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
               <div className="font-semibold mb-1 flex items-center gap-2">
@@ -150,7 +164,6 @@ const AddInvoice = () => {
           )}
 
           <form className="p-6 space-y-5" onSubmit={handleSubmit}>
-            {/* Invoice Number (auto-généré) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Numéro de Facture <span className="text-red-500">*</span>
@@ -166,7 +179,6 @@ const AddInvoice = () => {
               </div>
             </div>
 
-            {/* Date et Date d'échéance */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -202,7 +214,6 @@ const AddInvoice = () => {
               </div>
             </div>
 
-            {/* Montant total et Taxes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -244,7 +255,6 @@ const AddInvoice = () => {
               </div>
             </div>
 
-            {/* Statut et Conditions de paiement */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -292,11 +302,10 @@ const AddInvoice = () => {
               </div>
             </div>
 
-            {/* Boutons */}
             <div className="flex gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate('/invoices')}
+                onClick={() => navigate("/invoices")}
                 className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-xl transition duration-200"
                 disabled={isLoading}
               >

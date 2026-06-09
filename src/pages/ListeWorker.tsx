@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { instance } from '../config/axios';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from "react";
+import { instance } from "../config/axios";
+import { useNavigate } from "react-router-dom";
 
 interface Worker {
   id: string;
@@ -18,89 +18,133 @@ interface Worker {
   status: string;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+  message?: string;
+}
+
 const ListeWorker = () => {
   const navigate = useNavigate();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [workersPerPage] = useState(10);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState("");
 
-  useEffect(() => {
-    fetchWorkers();
-  }, []);
-
-  const fetchWorkers = async () => {
+  // ✅ Déclarer fetchWorkers AVANT le useEffect
+  const fetchWorkers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await instance.get('/workers/all');
+      const response = await instance.get("/workers/all");
       setWorkers(response.data);
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération des employés', error);
-      setError('Impossible de charger la liste des employés');
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la récupération des employés", error);
+      setError("Impossible de charger la liste des employés");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleDelete = async (id: string, fullName: string) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer l'employé "${fullName}" ?`)) {
-      setIsDeleting(id);
-      try {
-        await instance.delete(`/workers/${id}`);
-        await fetchWorkers();
-        alert('Employé supprimé avec succès');
-      } catch (error: any) {
-        console.error('Erreur lors de la suppression', error);
-        alert('Erreur lors de la suppression de l\'employé');
-      } finally {
-        setIsDeleting(null);
+  // ✅ useEffect APRÈS la déclaration
+  useEffect(() => {
+    fetchWorkers();
+  }, [fetchWorkers]);
+
+  const handleDelete = useCallback(
+    async (id: string, fullName: string) => {
+      if (
+        window.confirm(
+          `Êtes-vous sûr de vouloir supprimer l'employé "${fullName}" ?`,
+        )
+      ) {
+        setIsDeleting(id);
+        try {
+          await instance.delete(`/workers/${id}`);
+          await fetchWorkers();
+          alert("Employé supprimé avec succès");
+        } catch (err: unknown) {
+          const error = err as ApiError;
+          console.error("Erreur lors de la suppression", error);
+          alert("Erreur lors de la suppression de l'employé");
+        } finally {
+          setIsDeleting(null);
+        }
       }
-    }
-  };
+    },
+    [fetchWorkers],
+  );
 
-  const filteredWorkers = workers.filter(worker =>
-    (searchTerm === '' || 
-      worker.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      worker.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      worker.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      worker.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (departmentFilter === '' || worker.department === departmentFilter)
+  const filteredWorkers = workers.filter(
+    (worker) =>
+      (searchTerm === "" ||
+        worker.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        worker.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        worker.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        worker.jobTitle.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (departmentFilter === "" || worker.department === departmentFilter),
   );
 
   const indexOfLastWorker = currentPage * workersPerPage;
   const indexOfFirstWorker = indexOfLastWorker - workersPerPage;
-  const currentWorkers = filteredWorkers.slice(indexOfFirstWorker, indexOfLastWorker);
+  const currentWorkers = filteredWorkers.slice(
+    indexOfFirstWorker,
+    indexOfLastWorker,
+  );
   const totalPages = Math.ceil(filteredWorkers.length / workersPerPage);
 
-  const formatSalary = (salary: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+  const formatSalary = useCallback((salary: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
       minimumFractionDigits: 0,
     }).format(salary);
-  };
+  }, []);
 
-  const getContractIcon = (contract: string) => {
+  const getContractIcon = useCallback((contract: string) => {
     const icons: { [key: string]: string } = {
-      CDI: '📄',
-      CDD: '⏱️',
-      Stage: '🎓',
-      Freelance: '💼',
-      Intérim: '🤝',
-      Alternance: '🔄',
+      CDI: "📄",
+      CDD: "⏱️",
+      Stage: "🎓",
+      Freelance: "💼",
+      Intérim: "🤝",
+      Alternance: "🔄",
     };
-    return icons[contract] || '📋';
-  };
+    return icons[contract] || "📋";
+  }, []);
+
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchTerm(e.target.value);
+      setCurrentPage(1);
+    },
+    [],
+  );
+
+  const handleDepartmentFilterChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setDepartmentFilter(e.target.value);
+      setCurrentPage(1);
+    },
+    [],
+  );
+
+  const clearFilters = useCallback(() => {
+    setSearchTerm("");
+    setDepartmentFilter("");
+    setCurrentPage(1);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-sky-100 p-6">
       <div className="max-w-7xl mx-auto">
-        
         <div className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -108,10 +152,12 @@ const ListeWorker = () => {
                 <i className="fas fa-users text-blue-600"></i>
                 Liste des Employés
               </h1>
-              <p className="text-gray-600">Gérez tous les employés de votre entreprise</p>
+              <p className="text-gray-600">
+                Gérez tous les employés de votre entreprise
+              </p>
             </div>
             <button
-              onClick={() => navigate('/add-worker')}
+              onClick={() => navigate("/add-worker")}
               className="bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2 shadow-md"
             >
               <i className="fas fa-user-plus"></i>
@@ -129,21 +175,15 @@ const ListeWorker = () => {
                 placeholder="Rechercher par nom, email ou poste..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={handleSearchChange}
               />
             </div>
-            
+
             <div className="w-full md:w-64">
               <select
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
                 value={departmentFilter}
-                onChange={(e) => {
-                  setDepartmentFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={handleDepartmentFilterChange}
               >
                 <option value="">Tous les départements</option>
                 <option value="IT">💻 IT</option>
@@ -172,7 +212,10 @@ const ListeWorker = () => {
                 <i className="fas fa-exclamation-circle mr-2"></i>
                 <span>{error}</span>
               </div>
-              <button onClick={fetchWorkers} className="text-red-700 hover:text-red-900 font-semibold">
+              <button
+                onClick={fetchWorkers}
+                className="text-red-700 hover:text-red-900 font-semibold"
+              >
                 Réessayer
               </button>
             </div>
@@ -186,12 +229,11 @@ const ListeWorker = () => {
                 <i className="fas fa-users text-6xl text-gray-300 mb-4"></i>
                 {searchTerm || departmentFilter ? (
                   <>
-                    <p className="text-gray-500 text-lg mb-2">Aucun employé ne correspond à votre recherche</p>
+                    <p className="text-gray-500 text-lg mb-2">
+                      Aucun employé ne correspond à votre recherche
+                    </p>
                     <button
-                      onClick={() => {
-                        setSearchTerm('');
-                        setDepartmentFilter('');
-                      }}
+                      onClick={clearFilters}
                       className="text-blue-600 hover:text-blue-700 font-semibold"
                     >
                       Effacer les filtres
@@ -199,9 +241,11 @@ const ListeWorker = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-gray-500 text-lg mb-2">Aucun employé n'a été trouvé</p>
+                    <p className="text-gray-500 text-lg mb-2">
+                      Aucun employé n'a été trouvé
+                    </p>
                     <button
-                      onClick={() => navigate('/add-worker')}
+                      onClick={() => navigate("/add-worker")}
                       className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg"
                     >
                       Ajouter votre premier employé
@@ -216,46 +260,76 @@ const ListeWorker = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employé</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poste</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Département</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contrat</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salaire</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Employé
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Email
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Poste
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Département
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Contrat
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Salaire
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {currentWorkers.map((worker) => (
-                          <tr key={worker.id} className="hover:bg-gray-50 transition-colors">
+                          <tr
+                            key={worker.id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-r from-blue-500 to-sky-500 rounded-full flex items-center justify-center text-white font-semibold">
-                                  {worker.firstName.charAt(0)}{worker.lastName.charAt(0)}
+                                  {worker.firstName.charAt(0)}
+                                  {worker.lastName.charAt(0)}
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900">
                                     {worker.firstName} {worker.lastName}
                                   </div>
-                                  <div className="text-sm text-gray-500">{worker.city}</div>
+                                  <div className="text-sm text-gray-500">
+                                    {worker.city}
+                                  </div>
                                 </div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{worker.email}</div>
+                              <div className="text-sm text-gray-900">
+                                {worker.email}
+                              </div>
                               {worker.phoneNumber && (
-                                <div className="text-sm text-gray-500">{worker.phoneNumber}</div>
+                                <div className="text-sm text-gray-500">
+                                  {worker.phoneNumber}
+                                </div>
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{worker.jobTitle}</div>
+                              <div className="text-sm text-gray-900">
+                                {worker.jobTitle}
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{worker.department}</div>
+                              <div className="text-sm text-gray-900">
+                                {worker.department}
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900 flex items-center gap-1">
-                                <span>{getContractIcon(worker.contractType)}</span>
+                                <span>
+                                  {getContractIcon(worker.contractType)}
+                                </span>
                                 <span>{worker.contractType}</span>
                               </div>
                             </td>
@@ -264,20 +338,29 @@ const ListeWorker = () => {
                                 {formatSalary(worker.salary)}
                               </div>
                               {worker.hasCompanyCar && (
-                                <div className="text-xs text-gray-500">🚗 Voiture de fonction</div>
+                                <div className="text-xs text-gray-500">
+                                  🚗 Voiture de fonction
+                                </div>
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-3">
                                 <button
-                                  onClick={() => navigate(`/update-worker/${worker.id}`)}
+                                  onClick={() =>
+                                    navigate(`/update-worker/${worker.id}`)
+                                  }
                                   className="text-blue-600 hover:text-blue-900 transition-colors"
                                   title="Modifier"
                                 >
                                   <i className="fas fa-edit text-lg"></i>
                                 </button>
                                 <button
-                                  onClick={() => handleDelete(worker.id, `${worker.firstName} ${worker.lastName}`)}
+                                  onClick={() =>
+                                    handleDelete(
+                                      worker.id,
+                                      `${worker.firstName} ${worker.lastName}`,
+                                    )
+                                  }
                                   disabled={isDeleting === worker.id}
                                   className="text-red-600 hover:text-red-900 transition-colors disabled:opacity-50"
                                 >
@@ -300,7 +383,9 @@ const ListeWorker = () => {
                   <div className="flex justify-center mt-6">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
                         disabled={currentPage === 1}
                         className="px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                       >
@@ -310,7 +395,9 @@ const ListeWorker = () => {
                         Page {currentPage} sur {totalPages}
                       </span>
                       <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
                         disabled={currentPage === totalPages}
                         className="px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                       >

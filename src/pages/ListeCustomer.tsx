@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { instance } from '../config/axios';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from "react";
+import { instance } from "../config/axios";
+import { useNavigate } from "react-router-dom";
 
 interface Customer {
   id: string;
@@ -13,90 +13,140 @@ interface Customer {
   registrationDate: string;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+  message?: string;
+}
+
 const ListeCustomer = () => {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [customersPerPage] = useState(10);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState("");
 
-  useEffect(() => {
-    fetchCustomers();
-  }, []);
-
-  const fetchCustomers = async () => {
+  // ✅ Déclarer fetchCustomers AVANT le useEffect
+  const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await instance.get('/customers/all');
+      const response = await instance.get("/customers/all");
       setCustomers(response.data);
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération des clients', error);
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la récupération des clients", error);
       if (error.response?.status === 401) {
-        setError('Vous devez être connecté pour voir les clients');
+        setError("Vous devez être connecté pour voir les clients");
       } else {
-        setError('Impossible de charger la liste des clients');
+        setError("Impossible de charger la liste des clients");
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer le client "${name}" ?`)) {
-      setIsDeleting(id);
-      try {
-        await instance.delete(`/customers/${id}`);
-        await fetchCustomers();
-        alert('Client supprimé avec succès');
-      } catch (error: any) {
-        console.error('Erreur lors de la suppression', error);
-        if (error.response?.status === 401) {
-          alert('Vous n\'avez pas les droits pour supprimer ce client');
-        } else {
-          alert('Erreur lors de la suppression du client');
+  // ✅ useEffect APRÈS la déclaration
+  useEffect(() => {
+    fetchCustomers();
+  }, [fetchCustomers]);
+
+  const handleDelete = useCallback(
+    async (id: string, name: string) => {
+      if (
+        window.confirm(
+          `Êtes-vous sûr de vouloir supprimer le client "${name}" ?`,
+        )
+      ) {
+        setIsDeleting(id);
+        try {
+          await instance.delete(`/customers/${id}`);
+          await fetchCustomers();
+          alert("Client supprimé avec succès");
+        } catch (err: unknown) {
+          const error = err as ApiError;
+          console.error("Erreur lors de la suppression", error);
+          if (error.response?.status === 401) {
+            alert("Vous n'avez pas les droits pour supprimer ce client");
+          } else {
+            alert("Erreur lors de la suppression du client");
+          }
+        } finally {
+          setIsDeleting(null);
         }
-      } finally {
-        setIsDeleting(null);
       }
-    }
-  };
+    },
+    [fetchCustomers],
+  );
 
-  const filteredCustomers = customers.filter(customer => {
-    const matchesSearch = searchTerm === '' || 
+  const filteredCustomers = customers.filter((customer) => {
+    const matchesSearch =
+      searchTerm === "" ||
       customer.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       customer.phoneNumber.includes(searchTerm);
-    
-    const matchesType = typeFilter === '' || customer.customerType === typeFilter;
-    
+
+    const matchesType =
+      typeFilter === "" || customer.customerType === typeFilter;
+
     return matchesSearch && matchesType;
   });
 
   const indexOfLastCustomer = currentPage * customersPerPage;
   const indexOfFirstCustomer = indexOfLastCustomer - customersPerPage;
-  const currentCustomers = filteredCustomers.slice(indexOfFirstCustomer, indexOfLastCustomer);
+  const currentCustomers = filteredCustomers.slice(
+    indexOfFirstCustomer,
+    indexOfLastCustomer,
+  );
   const totalPages = Math.ceil(filteredCustomers.length / customersPerPage);
 
-  const getCustomerTypeIcon = (type: string) => {
-    switch(type) {
-      case 'vip': return '💎';
-      case 'wholesale': return '📦';
-      case 'retail': return '🛍️';
-      default: return '🟢';
+  const getCustomerTypeIcon = useCallback((type: string) => {
+    switch (type) {
+      case "vip":
+        return "💎";
+      case "wholesale":
+        return "📦";
+      case "retail":
+        return "🛍️";
+      default:
+        return "🟢";
     }
-  };
+  }, []);
 
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchTerm(e.target.value);
+      setCurrentPage(1);
+    },
+    [],
+  );
+
+  const handleTypeFilterChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setTypeFilter(e.target.value);
+      setCurrentPage(1);
+    },
+    [],
+  );
+
+  const clearFilters = useCallback(() => {
+    setSearchTerm("");
+    setTypeFilter("");
+    setCurrentPage(1);
+  }, []);
+
+  // Reste du JSX identique, seulement remplacer les onChange inline par les callbacks
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-6">
       <div className="max-w-7xl mx-auto">
-        
-        {/* Header */}
+        {/* Header - identique */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -107,7 +157,7 @@ const ListeCustomer = () => {
               <p className="text-gray-600">Gérez tous vos clients</p>
             </div>
             <button
-              onClick={() => navigate('/add-customer')}
+              onClick={() => navigate("/add-customer")}
               className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2 shadow-md"
             >
               <i className="fas fa-user-plus"></i>
@@ -126,20 +176,14 @@ const ListeCustomer = () => {
                 placeholder="Rechercher par nom, email ou téléphone..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent"
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={handleSearchChange}
               />
             </div>
             <div className="w-full md:w-64">
               <select
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent"
                 value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={handleTypeFilterChange}
               >
                 <option value="">Tous les types</option>
                 <option value="regular">🟢 Regular</option>
@@ -179,7 +223,7 @@ const ListeCustomer = () => {
           </div>
         )}
 
-        {/* Liste des clients */}
+        {/* Liste des clients - identique au reste */}
         {!isLoading && !error && (
           <>
             {filteredCustomers.length === 0 ? (
@@ -187,12 +231,11 @@ const ListeCustomer = () => {
                 <i className="fas fa-users-slash text-6xl text-gray-300 mb-4"></i>
                 {searchTerm || typeFilter ? (
                   <>
-                    <p className="text-gray-500 text-lg mb-2">Aucun client ne correspond à votre recherche</p>
+                    <p className="text-gray-500 text-lg mb-2">
+                      Aucun client ne correspond à votre recherche
+                    </p>
                     <button
-                      onClick={() => {
-                        setSearchTerm('');
-                        setTypeFilter('');
-                      }}
+                      onClick={clearFilters}
                       className="text-purple-600 hover:text-purple-700 font-semibold"
                     >
                       Effacer les filtres
@@ -200,9 +243,11 @@ const ListeCustomer = () => {
                   </>
                 ) : (
                   <>
-                    <p className="text-gray-500 text-lg mb-2">Aucun client n'a été trouvé</p>
+                    <p className="text-gray-500 text-lg mb-2">
+                      Aucun client n'a été trouvé
+                    </p>
                     <button
-                      onClick={() => navigate('/add-customer')}
+                      onClick={() => navigate("/add-customer")}
                       className="mt-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200"
                     >
                       Ajouter votre premier client
@@ -217,59 +262,90 @@ const ListeCustomer = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Téléphone</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Adresse</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Email
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Téléphone
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Adresse
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Type
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {currentCustomers.map((customer) => (
-                          <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                          <tr
+                            key={customer.id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold">
-                                  {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
+                                  {customer.firstName.charAt(0)}
+                                  {customer.lastName.charAt(0)}
                                 </div>
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900">
                                     {customer.firstName} {customer.lastName}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {customer.address.split(',')[0]}
+                                    {customer.address.split(",")[0]}
                                   </div>
                                 </div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">{customer.email}</div>
+                              <div className="text-sm text-gray-900">
+                                {customer.email}
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-500">{customer.phoneNumber}</div>
+                              <div className="text-sm text-gray-500">
+                                {customer.phoneNumber}
+                              </div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-500 max-w-xs truncate" title={customer.address}>
+                              <div
+                                className="text-sm text-gray-500 max-w-xs truncate"
+                                title={customer.address}
+                              >
                                 {customer.address}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                                {getCustomerTypeIcon(customer.customerType)} {customer.customerType}
+                                {getCustomerTypeIcon(customer.customerType)}{" "}
+                                {customer.customerType}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-3">
                                 <button
-                                  onClick={() => navigate(`/update-customer/${customer.id}`)}
+                                  onClick={() =>
+                                    navigate(`/update-customer/${customer.id}`)
+                                  }
                                   className="text-blue-600 hover:text-blue-900 transition-colors"
                                   title="Modifier"
                                 >
                                   <i className="fas fa-edit text-lg"></i>
                                 </button>
                                 <button
-                                  onClick={() => handleDelete(customer.id, `${customer.firstName} ${customer.lastName}`)}
+                                  onClick={() =>
+                                    handleDelete(
+                                      customer.id,
+                                      `${customer.firstName} ${customer.lastName}`,
+                                    )
+                                  }
                                   disabled={isDeleting === customer.id}
                                   className="text-red-600 hover:text-red-900 transition-colors disabled:opacity-50"
                                 >
@@ -293,7 +369,9 @@ const ListeCustomer = () => {
                   <div className="flex justify-center mt-6">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
                         disabled={currentPage === 1}
                         className="px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                       >
@@ -303,7 +381,9 @@ const ListeCustomer = () => {
                         Page {currentPage} sur {totalPages}
                       </span>
                       <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
                         disabled={currentPage === totalPages}
                         className="px-3 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                       >

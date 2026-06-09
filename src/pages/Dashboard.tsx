@@ -1,10 +1,9 @@
-// Dashboard.tsx (version finale avec les quatre dashboards)
-import React, { useEffect, useState } from 'react';
-import { instance } from '../config/axios';
-import { useNavigate } from 'react-router-dom';
-import DashboardCustomer from './DashboardCustomer';
-import ProductDashboard from './ProductDashboard';
-import WorkerDashboard from './WorkerDashboard';
+import React, { useEffect, useState, useCallback } from "react";
+import { instance } from "../config/axios";
+import { useNavigate } from "react-router-dom";
+import DashboardCustomer from "./DashboardCustomer";
+import ProductDashboard from "./ProductDashboard";
+import WorkerDashboard from "./WorkerDashboard";
 
 interface Vehicle {
   id: string;
@@ -22,9 +21,17 @@ interface Vehicle {
   updatedAt?: string;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+  message?: string;
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [_vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,85 +40,126 @@ const Dashboard = () => {
     available: 0,
     inUse: 0,
     maintenance: 0,
-    outOfService: 0
+    outOfService: 0,
   });
 
-  // Status options avec leurs couleurs
   const statusOptions = [
-    { value: 'available', label: 'Disponible', icon: '🟢', color: 'text-green-600', bgColor: 'bg-green-100' },
-    { value: 'in-use', label: 'En utilisation', icon: '🔵', color: 'text-blue-600', bgColor: 'bg-blue-100' },
-    { value: 'maintenance', label: 'En maintenance', icon: '🟡', color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
-    { value: 'out-of-service', label: 'Hors service', icon: '🔴', color: 'text-red-600', bgColor: 'bg-red-100' },
+    {
+      value: "available",
+      label: "Disponible",
+      icon: "🟢",
+      color: "text-green-600",
+      bgColor: "bg-green-100",
+    },
+    {
+      value: "in-use",
+      label: "En utilisation",
+      icon: "🔵",
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+    },
+    {
+      value: "maintenance",
+      label: "En maintenance",
+      icon: "🟡",
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-100",
+    },
+    {
+      value: "out-of-service",
+      label: "Hors service",
+      icon: "🔴",
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+    },
   ];
 
-  // Vehicle type options avec leurs icônes
   const vehicleTypeIcons: { [key: string]: string } = {
-    'SUV': '🚙',
-    'Berline': '🚗',
-    'Break': '🚐',
-    'Citadine': '🚗',
-    'Utilitaire': '🚛',
-    'Moto': '🏍️'
+    SUV: "🚙",
+    Berline: "🚗",
+    Break: "🚐",
+    Citadine: "🚗",
+    Utilitaire: "🚛",
+    Moto: "🏍️",
   };
 
-  // Récupérer tous les véhicules
-  useEffect(() => {
-    fetchVehicles();
-  }, []);
-
-  const fetchVehicles = async () => {
+  // ✅ Déclarer fetchVehicles AVANT le useEffect
+  const fetchVehicles = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await instance.get('/vehicules/all');
+      const response = await instance.get("/vehicules/all");
       const allVehicles = response.data;
       setVehicles(allVehicles);
-      
-      // Filtrer les véhicules disponibles
-      const available = allVehicles.filter((v: Vehicle) => v.status === 'available');
+
+      const available = allVehicles.filter(
+        (v: Vehicle) => v.status === "available",
+      );
       setAvailableVehicles(available);
-      
-      // Calculer les statistiques
+
       const newStats = {
         total: allVehicles.length,
-        available: allVehicles.filter((v: Vehicle) => v.status === 'available').length,
-        inUse: allVehicles.filter((v: Vehicle) => v.status === 'in-use').length,
-        maintenance: allVehicles.filter((v: Vehicle) => v.status === 'maintenance').length,
-        outOfService: allVehicles.filter((v: Vehicle) => v.status === 'out-of-service').length
+        available: allVehicles.filter((v: Vehicle) => v.status === "available")
+          .length,
+        inUse: allVehicles.filter((v: Vehicle) => v.status === "in-use").length,
+        maintenance: allVehicles.filter(
+          (v: Vehicle) => v.status === "maintenance",
+        ).length,
+        outOfService: allVehicles.filter(
+          (v: Vehicle) => v.status === "out-of-service",
+        ).length,
       };
       setStats(newStats);
-      
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération des véhicules', error);
-      setError('Impossible de charger les données du dashboard');
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la récupération des véhicules", error);
+      setError("Impossible de charger les données du dashboard");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const getStatusInfo = (status: string) => {
-    const option = statusOptions.find(opt => opt.value === status);
-    return option || { icon: '⚪', label: status, color: 'text-gray-600', bgColor: 'bg-gray-100' };
-  };
+  // ✅ useEffect APRÈS la déclaration
+  useEffect(() => {
+    fetchVehicles();
+  }, [fetchVehicles]);
 
-  const getVehicleTypeIcon = (type: string) => {
-    return vehicleTypeIcons[type] || '🚗';
-  };
+  const getStatusInfo = useCallback(
+    (status: string) => {
+      const option = statusOptions.find((opt) => opt.value === status);
+      return (
+        option || {
+          icon: "⚪",
+          label: status,
+          color: "text-gray-600",
+          bgColor: "bg-gray-100",
+        }
+      );
+    },
+    [statusOptions],
+  );
 
-  // Rediriger vers la page de modification
-  const handleEdit = (id: string) => {
-    navigate(`/update-vehicle/${id}`);
-  };
+  const getVehicleTypeIcon = useCallback(
+    (type: string) => {
+      return vehicleTypeIcons[type] || "🚗";
+    },
+    [vehicleTypeIcons],
+  );
 
-  // Rediriger vers la page d'ajout
-  const handleAddVehicle = () => {
-    navigate('/add-vehicle');
-  };
+  const handleEdit = useCallback(
+    (id: string) => {
+      navigate(`/update-vehicle/${id}`);
+    },
+    [navigate],
+  );
 
-  // Voir tous les véhicules
-  const handleViewAll = () => {
-    navigate('/liste-vehicules');
-  };
+  const handleAddVehicle = useCallback(() => {
+    navigate("/add-vehicle");
+  }, [navigate]);
+
+  const handleViewAll = useCallback(() => {
+    navigate("/liste-vehicules");
+  }, [navigate]);
 
   if (isLoading) {
     return (
@@ -127,8 +175,6 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-6">
       <div className="max-w-7xl mx-auto">
-        
-        {/* En-tête */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -137,7 +183,8 @@ const Dashboard = () => {
                 Dashboard Global
               </h1>
               <p className="text-gray-600 text-lg">
-                Bienvenue dans votre espace utilisateur. Voici un aperçu global de votre entreprise.
+                Bienvenue dans votre espace utilisateur. Voici un aperçu global
+                de votre entreprise.
               </p>
             </div>
             <div className="flex gap-3">
@@ -159,14 +206,15 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Cartes de statistiques des véhicules */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-300">
             <div className="flex items-center justify-between mb-4">
               <div className="p-3 bg-blue-100 rounded-xl">
                 <i className="fas fa-car text-2xl text-blue-600"></i>
               </div>
-              <span className="text-3xl font-bold text-gray-800">{stats.total}</span>
+              <span className="text-3xl font-bold text-gray-800">
+                {stats.total}
+              </span>
             </div>
             <h3 className="text-gray-600 font-medium">Total véhicules</h3>
             <p className="text-sm text-gray-400 mt-1">Flotte complète</p>
@@ -177,7 +225,9 @@ const Dashboard = () => {
               <div className="p-3 bg-green-100 rounded-xl">
                 <i className="fas fa-check-circle text-2xl text-green-600"></i>
               </div>
-              <span className="text-3xl font-bold text-green-600">{stats.available}</span>
+              <span className="text-3xl font-bold text-green-600">
+                {stats.available}
+              </span>
             </div>
             <h3 className="text-gray-600 font-medium">Disponibles</h3>
             <p className="text-sm text-gray-400 mt-1">Prêts à rouler</p>
@@ -188,7 +238,9 @@ const Dashboard = () => {
               <div className="p-3 bg-blue-100 rounded-xl">
                 <i className="fas fa-road text-2xl text-blue-600"></i>
               </div>
-              <span className="text-3xl font-bold text-blue-600">{stats.inUse}</span>
+              <span className="text-3xl font-bold text-blue-600">
+                {stats.inUse}
+              </span>
             </div>
             <h3 className="text-gray-600 font-medium">En utilisation</h3>
             <p className="text-sm text-gray-400 mt-1">Actuellement en route</p>
@@ -199,7 +251,9 @@ const Dashboard = () => {
               <div className="p-3 bg-yellow-100 rounded-xl">
                 <i className="fas fa-wrench text-2xl text-yellow-600"></i>
               </div>
-              <span className="text-3xl font-bold text-yellow-600">{stats.maintenance}</span>
+              <span className="text-3xl font-bold text-yellow-600">
+                {stats.maintenance}
+              </span>
             </div>
             <h3 className="text-gray-600 font-medium">En maintenance</h3>
             <p className="text-sm text-gray-400 mt-1">En réparation</p>
@@ -210,14 +264,15 @@ const Dashboard = () => {
               <div className="p-3 bg-red-100 rounded-xl">
                 <i className="fas fa-ban text-2xl text-red-600"></i>
               </div>
-              <span className="text-3xl font-bold text-red-600">{stats.outOfService}</span>
+              <span className="text-3xl font-bold text-red-600">
+                {stats.outOfService}
+              </span>
             </div>
             <h3 className="text-gray-600 font-medium">Hors service</h3>
             <p className="text-sm text-gray-400 mt-1">Indisponibles</p>
           </div>
         </div>
 
-        {/* Section des véhicules disponibles */}
         <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
             <div className="flex justify-between items-center">
@@ -261,8 +316,12 @@ const Dashboard = () => {
               <div className="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i className="fas fa-car text-5xl text-gray-400"></i>
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Aucun véhicule disponible</h3>
-              <p className="text-gray-500 mb-6">Aucun véhicule n'est actuellement disponible.</p>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                Aucun véhicule disponible
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Aucun véhicule n'est actuellement disponible.
+              </p>
               {stats.total === 0 ? (
                 <button
                   onClick={handleAddVehicle}
@@ -293,12 +352,14 @@ const Dashboard = () => {
                         className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 group"
                       >
                         <div className={`h-2 ${statusInfo.bgColor}`}></div>
-                        
+
                         <div className="p-5">
                           <div className="flex justify-between items-start mb-4">
                             <div>
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-2xl">{getVehicleTypeIcon(vehicle.vehicleType)}</span>
+                                <span className="text-2xl">
+                                  {getVehicleTypeIcon(vehicle.vehicleType)}
+                                </span>
                                 <h3 className="font-bold text-gray-800 text-lg">
                                   {vehicle.make} {vehicle.model}
                                 </h3>
@@ -307,7 +368,9 @@ const Dashboard = () => {
                                 {vehicle.registrationNumber}
                               </p>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusInfo.bgColor} ${statusInfo.color}`}>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${statusInfo.bgColor} ${statusInfo.color}`}
+                            >
                               {statusInfo.icon} {statusInfo.label}
                             </span>
                           </div>
@@ -321,15 +384,23 @@ const Dashboard = () => {
                               <i className="fas fa-palette w-4 text-gray-400"></i>
                               <div className="flex items-center gap-2">
                                 <span>Couleur: {vehicle.color}</span>
-                                <div 
+                                <div
                                   className="w-4 h-4 rounded-full border border-gray-300"
-                                  style={{ backgroundColor: vehicle.color.toLowerCase() }}
+                                  style={{
+                                    backgroundColor:
+                                      vehicle.color.toLowerCase(),
+                                  }}
                                 ></div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-gray-600">
                               <i className="fas fa-calendar-plus w-4 text-gray-400"></i>
-                              <span>Achat: {new Date(vehicle.purchaseDate).toLocaleDateString('fr-FR')}</span>
+                              <span>
+                                Achat:{" "}
+                                {new Date(
+                                  vehicle.purchaseDate,
+                                ).toLocaleDateString("fr-FR")}
+                              </span>
                             </div>
                           </div>
 
@@ -362,7 +433,10 @@ const Dashboard = () => {
                     onClick={handleViewAll}
                     className="text-green-600 hover:text-green-700 font-semibold flex items-center justify-center gap-2 mx-auto"
                   >
-                    <span>Voir les {availableVehicles.length - 6} autres véhicules disponibles</span>
+                    <span>
+                      Voir les {availableVehicles.length - 6} autres véhicules
+                      disponibles
+                    </span>
                     <i className="fas fa-arrow-right"></i>
                   </button>
                 </div>
@@ -371,13 +445,8 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Dashboard Client */}
         <DashboardCustomer />
-
-        {/* Dashboard Produit */}
         <ProductDashboard />
-
-        {/* Dashboard Worker / RH */}
         <WorkerDashboard />
       </div>
     </div>

@@ -1,7 +1,6 @@
-// components/DashboardCustomer.tsx
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { instance } from '../config/axios';
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { instance } from "../config/axios";
 
 interface Customer {
   id: string;
@@ -23,6 +22,14 @@ interface CustomerStats {
   newThisMonth: number;
 }
 
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+  message?: string;
+}
+
 const DashboardCustomer = () => {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -35,102 +42,132 @@ const DashboardCustomer = () => {
     vip: 0,
     wholesale: 0,
     retail: 0,
-    newThisMonth: 0
+    newThisMonth: 0,
   });
 
   // Fonction pour obtenir l'icône du type de client
-  const getCustomerTypeIcon = (type: string) => {
-    switch(type) {
-      case 'vip': return '💎';
-      case 'wholesale': return '📦';
-      case 'retail': return '🛍️';
-      default: return '🟢';
+  const getCustomerTypeIcon = useCallback((type: string): string => {
+    switch (type) {
+      case "vip":
+        return "💎";
+      case "wholesale":
+        return "📦";
+      case "retail":
+        return "🛍️";
+      default:
+        return "🟢";
     }
-  };
+  }, []);
 
   // Fonction pour obtenir la couleur du type de client
-  const getCustomerTypeColor = (type: string) => {
-    switch(type) {
-      case 'vip': return 'from-yellow-400 to-orange-500';
-      case 'wholesale': return 'from-blue-400 to-indigo-500';
-      case 'retail': return 'from-green-400 to-emerald-500';
-      default: return 'from-purple-400 to-pink-500';
+  const getCustomerTypeColor = useCallback((type: string): string => {
+    switch (type) {
+      case "vip":
+        return "from-yellow-400 to-orange-500";
+      case "wholesale":
+        return "from-blue-400 to-indigo-500";
+      case "retail":
+        return "from-green-400 to-emerald-500";
+      default:
+        return "from-purple-400 to-pink-500";
     }
-  };
+  }, []);
 
   // Récupérer tous les clients
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await instance.get('/customers/all');
-      const allCustomers = response.data;
+      const response = await instance.get("/customers/all");
+      const allCustomers = response.data as Customer[];
       setCustomers(allCustomers);
-      
+
       // Récupérer les 6 clients les plus récents
       const recent = [...allCustomers]
-        .sort((a, b) => new Date(b.registrationDate).getTime() - new Date(a.registrationDate).getTime())
+        .sort(
+          (a, b) =>
+            new Date(b.registrationDate).getTime() -
+            new Date(a.registrationDate).getTime(),
+        )
         .slice(0, 6);
       setRecentCustomers(recent);
-      
+
       // Calculer les statistiques
       const newStats: CustomerStats = {
         total: allCustomers.length,
-        regular: allCustomers.filter((c: Customer) => c.customerType === 'regular').length,
-        vip: allCustomers.filter((c: Customer) => c.customerType === 'vip').length,
-        wholesale: allCustomers.filter((c: Customer) => c.customerType === 'wholesale').length,
-        retail: allCustomers.filter((c: Customer) => c.customerType === 'retail').length,
-        newThisMonth: 0
+        regular: allCustomers.filter(
+          (c: Customer) => c.customerType === "regular",
+        ).length,
+        vip: allCustomers.filter((c: Customer) => c.customerType === "vip")
+          .length,
+        wholesale: allCustomers.filter(
+          (c: Customer) => c.customerType === "wholesale",
+        ).length,
+        retail: allCustomers.filter(
+          (c: Customer) => c.customerType === "retail",
+        ).length,
+        newThisMonth: 0,
       };
-      
+
       // Calculer les nouveaux clients du mois
       const startOfMonth = new Date();
       startOfMonth.setDate(1);
       startOfMonth.setHours(0, 0, 0, 0);
-      
+
       newStats.newThisMonth = allCustomers.filter((c: Customer) => {
         const regDate = new Date(c.registrationDate);
         return regDate >= startOfMonth;
       }).length;
-      
+
       setStats(newStats);
-      
-    } catch (error: any) {
-      console.error('Erreur lors de la récupération des clients', error);
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      console.error("Erreur lors de la récupération des clients", error);
       if (error.response?.status === 401) {
-        setError('Vous devez être connecté pour voir les clients');
+        setError("Vous devez être connecté pour voir les clients");
       } else {
-        setError('Impossible de charger les données des clients');
+        setError("Impossible de charger les données des clients");
       }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [fetchCustomers]);
 
-  const handleEdit = (id: string) => {
-    navigate(`/update-customer/${id}`);
-  };
+  const handleEdit = useCallback(
+    (id: string) => {
+      navigate(`/update-customer/${id}`);
+    },
+    [navigate],
+  );
 
-  const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer le client "${name}" ?`)) {
-      try {
-        await instance.delete(`/customers/${id}`);
-        await fetchCustomers();
-        alert('Client supprimé avec succès');
-      } catch (error: any) {
-        console.error('Erreur lors de la suppression', error);
-        if (error.response?.status === 401) {
-          alert('Vous n\'avez pas les droits pour supprimer ce client');
-        } else {
-          alert('Erreur lors de la suppression du client');
+  const handleDelete = useCallback(
+    async (id: string, name: string) => {
+      if (
+        window.confirm(
+          `Êtes-vous sûr de vouloir supprimer le client "${name}" ?`,
+        )
+      ) {
+        try {
+          await instance.delete(`/customers/${id}`);
+          await fetchCustomers();
+          alert("Client supprimé avec succès");
+        } catch (err: unknown) {
+          const error = err as ApiError;
+          console.error("Erreur lors de la suppression", error);
+          if (error.response?.status === 401) {
+            alert("Vous n'avez pas les droits pour supprimer ce client");
+          } else {
+            alert("Erreur lors de la suppression du client");
+          }
         }
       }
-    }
-  };
+    },
+    [fetchCustomers],
+  );
 
   if (isLoading) {
     return (
@@ -157,14 +194,14 @@ const DashboardCustomer = () => {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => navigate('/customers')}
+              onClick={() => navigate("/customers")}
               className="bg-white hover:bg-gray-50 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2 shadow-md border border-gray-200"
             >
               <i className="fas fa-list"></i>
               Voir tous
             </button>
             <button
-              onClick={() => navigate('/add-customer')}
+              onClick={() => navigate("/add-customer")}
               className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 flex items-center gap-2 shadow-md"
             >
               <i className="fas fa-user-plus"></i>
@@ -181,7 +218,9 @@ const DashboardCustomer = () => {
             <div className="p-2 bg-purple-100 rounded-lg">
               <i className="fas fa-users text-purple-600"></i>
             </div>
-            <span className="text-2xl font-bold text-gray-800">{stats.total}</span>
+            <span className="text-2xl font-bold text-gray-800">
+              {stats.total}
+            </span>
           </div>
           <h3 className="text-sm font-medium text-gray-600">Total clients</h3>
         </div>
@@ -191,7 +230,9 @@ const DashboardCustomer = () => {
             <div className="p-2 bg-green-100 rounded-lg">
               <i className="fas fa-user text-green-600"></i>
             </div>
-            <span className="text-2xl font-bold text-green-600">{stats.regular}</span>
+            <span className="text-2xl font-bold text-green-600">
+              {stats.regular}
+            </span>
           </div>
           <h3 className="text-sm font-medium text-gray-600">Regular</h3>
         </div>
@@ -201,7 +242,9 @@ const DashboardCustomer = () => {
             <div className="p-2 bg-yellow-100 rounded-lg">
               <i className="fas fa-gem text-yellow-600"></i>
             </div>
-            <span className="text-2xl font-bold text-yellow-600">{stats.vip}</span>
+            <span className="text-2xl font-bold text-yellow-600">
+              {stats.vip}
+            </span>
           </div>
           <h3 className="text-sm font-medium text-gray-600">VIP</h3>
         </div>
@@ -211,7 +254,9 @@ const DashboardCustomer = () => {
             <div className="p-2 bg-blue-100 rounded-lg">
               <i className="fas fa-boxes text-blue-600"></i>
             </div>
-            <span className="text-2xl font-bold text-blue-600">{stats.wholesale}</span>
+            <span className="text-2xl font-bold text-blue-600">
+              {stats.wholesale}
+            </span>
           </div>
           <h3 className="text-sm font-medium text-gray-600">Wholesale</h3>
         </div>
@@ -221,7 +266,9 @@ const DashboardCustomer = () => {
             <div className="p-2 bg-emerald-100 rounded-lg">
               <i className="fas fa-shopping-bag text-emerald-600"></i>
             </div>
-            <span className="text-2xl font-bold text-emerald-600">{stats.retail}</span>
+            <span className="text-2xl font-bold text-emerald-600">
+              {stats.retail}
+            </span>
           </div>
           <h3 className="text-sm font-medium text-gray-600">Retail</h3>
         </div>
@@ -231,9 +278,13 @@ const DashboardCustomer = () => {
             <div className="p-2 bg-orange-100 rounded-lg">
               <i className="fas fa-calendar-plus text-orange-600"></i>
             </div>
-            <span className="text-2xl font-bold text-orange-600">{stats.newThisMonth}</span>
+            <span className="text-2xl font-bold text-orange-600">
+              {stats.newThisMonth}
+            </span>
           </div>
-          <h3 className="text-sm font-medium text-gray-600">Nouveaux ce mois</h3>
+          <h3 className="text-sm font-medium text-gray-600">
+            Nouveaux ce mois
+          </h3>
         </div>
       </div>
 
@@ -246,11 +297,13 @@ const DashboardCustomer = () => {
                 <i className="fas fa-clock"></i>
                 Clients récents ({recentCustomers.length})
               </h3>
-              <p className="text-purple-100 text-xs mt-1">Les derniers clients inscrits</p>
+              <p className="text-purple-100 text-xs mt-1">
+                Les derniers clients inscrits
+              </p>
             </div>
             {recentCustomers.length === 6 && stats.total > 6 && (
               <button
-                onClick={() => navigate('/customers')}
+                onClick={() => navigate("/customers")}
                 className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg transition-colors text-sm font-semibold"
               >
                 Voir tous
@@ -283,7 +336,7 @@ const DashboardCustomer = () => {
             </div>
             <p className="text-gray-500">Aucun client pour le moment</p>
             <button
-              onClick={() => navigate('/add-customer')}
+              onClick={() => navigate("/add-customer")}
               className="mt-3 text-purple-600 hover:text-purple-700 font-semibold text-sm"
             >
               Ajouter votre premier client
@@ -300,18 +353,22 @@ const DashboardCustomer = () => {
                   className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-all duration-300"
                 >
                   {/* Header avec dégradé selon le type */}
-                  <div className={`bg-gradient-to-r ${getCustomerTypeColor(customer.customerType)} p-3 text-white`}>
+                  <div
+                    className={`bg-gradient-to-r ${getCustomerTypeColor(customer.customerType)} p-3 text-white`}
+                  >
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold backdrop-blur-sm">
-                          {customer.firstName.charAt(0)}{customer.lastName.charAt(0)}
+                          {customer.firstName.charAt(0)}
+                          {customer.lastName.charAt(0)}
                         </div>
                         <div>
                           <h4 className="font-bold text-sm">
                             {customer.firstName} {customer.lastName}
                           </h4>
                           <p className="text-white/80 text-xs">
-                            {getCustomerTypeIcon(customer.customerType)} {customer.customerType}
+                            {getCustomerTypeIcon(customer.customerType)}{" "}
+                            {customer.customerType}
                           </p>
                         </div>
                       </div>
@@ -333,7 +390,12 @@ const DashboardCustomer = () => {
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
                       <i className="fas fa-calendar-alt w-3 text-gray-400"></i>
-                      <span className="text-xs">Inscrit le: {new Date(customer.registrationDate).toLocaleDateString('fr-FR')}</span>
+                      <span className="text-xs">
+                        Inscrit le:{" "}
+                        {new Date(customer.registrationDate).toLocaleDateString(
+                          "fr-FR",
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -347,7 +409,12 @@ const DashboardCustomer = () => {
                       Modifier
                     </button>
                     <button
-                      onClick={() => handleDelete(customer.id, `${customer.firstName} ${customer.lastName}`)}
+                      onClick={() =>
+                        handleDelete(
+                          customer.id,
+                          `${customer.firstName} ${customer.lastName}`,
+                        )
+                      }
                       className="flex-1 px-2 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1"
                     >
                       <i className="fas fa-trash-alt text-xs"></i>
