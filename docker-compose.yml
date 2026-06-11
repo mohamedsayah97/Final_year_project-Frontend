@@ -1,0 +1,54 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: react_frontend_dev
+    ports:
+      - "5173:5173"
+    environment:
+      NODE_ENV: development
+      VITE_API_URL: http://localhost:3000
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - monitoring-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus_frontend
+    restart: always
+    ports:
+      - "9091:9090"  # Port changé
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitoring-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana_frontend
+    restart: always
+    ports:
+      - "3003:3000"  # Changé de 3001 à 3003
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - monitoring-network
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+networks:
+  monitoring-network:
+    driver: bridge
+
+volumes:
+  grafana_data:
