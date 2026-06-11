@@ -1,21 +1,9 @@
-import { defineConfig } from "vite"; // ← Changez de vitest à vite
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// Configuration Vite pour le build
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: {
-    port: 5173,
-  },
-  build: {
-    outDir: "dist",
-    sourcemap: false,
-  },
-});
-
-// Configuration Vitest séparée (optionnelle)
-export const testConfig = {
   test: {
     globals: true,
     environment: "jsdom",
@@ -32,4 +20,4 @@ export const testConfig = {
       ],
     },
   },
-};
+});

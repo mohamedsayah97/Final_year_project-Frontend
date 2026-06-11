@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:ci": "vite build",
-    "build:skip-types": "tsc -b --skipLibCheck --noEmit || true && vite build",
+    "build": "tsc --noEmit --skipLibCheck && vite build",
+    "build:force": "vite build",
+    "build:ci": "vite build --emptyOutDir",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 100",
     "lint:fix": "eslint . --ext ts,tsx --fix",
@@ -27,8 +27,13 @@
     "snyk:fix": "snyk wizard",
     "security": "npm audit && npm run snyk:test",
     "security:fix": "npm audit fix && npm run snyk:fix",
-    "typecheck": "tsc --noEmit",
-    "typecheck:ci": "tsc --noEmit --skipLibCheck || true"
+    "typecheck": "tsc --noEmit --skipLibCheck",
+    "typecheck:ci": "tsc --noEmit --skipLibCheck || true",
+    "pm2:start": "npm run build:force && pm2 start \"npx serve -s dist -l 5173\" --name react-app",
+    "pm2:stop": "pm2 stop react-app",
+    "pm2:restart": "pm2 restart react-app",
+    "pm2:delete": "pm2 delete react-app",
+    "pm2:logs": "pm2 logs react-app"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",

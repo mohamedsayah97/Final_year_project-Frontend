@@ -1,11 +1,11 @@
 // src/setupTests.ts
-import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import "@testing-library/jest-dom";
+import { vi } from "vitest";
 
 // Mock pour window.matchMedia (nécessaire pour certains composants)
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(window, "matchMedia", {
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
+  value: vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -24,7 +24,7 @@ const localStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-global.localStorage = localStorageMock as any;
+(window as any).localStorage = localStorageMock;
 
 // Mock pour sessionStorage
 const sessionStorageMock = {
@@ -33,10 +33,10 @@ const sessionStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-global.sessionStorage = sessionStorageMock as any;
+(window as any).sessionStorage = sessionStorageMock;
 
-// Mock pour IntersectionObserver (si nécessaire)
-global.IntersectionObserver = class IntersectionObserver {
+// Mock pour IntersectionObserver
+(window as any).IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
   observe() {}
@@ -44,15 +44,12 @@ global.IntersectionObserver = class IntersectionObserver {
     return [];
   }
   unobserve() {}
-} as any;
+};
 
-// Mock pour ResizeObserver (si nécessaire)
-global.ResizeObserver = class ResizeObserver {
+// Mock pour ResizeObserver
+(window as any).ResizeObserver = class ResizeObserver {
   constructor() {}
   disconnect() {}
   observe() {}
   unobserve() {}
-} as any;
-
-// Nettoyage automatique après chaque test (optionnel)
-// Note: Avec Vitest, vous pouvez aussi utiliser aprèsEach directement dans les tests
+};
