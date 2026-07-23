@@ -7,10 +7,29 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dossiers de dépendances et build
 node_modules
 dist
 dist-ssr
+build
 *.local
+
+# Fichiers d'environnement
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Terraform (IMPORTANT pour éviter les gros fichiers)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.backup
+*.tfplan
+*.tfstate.backup
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +41,37 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+*.tmp
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Vite
+.vite
